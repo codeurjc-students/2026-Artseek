@@ -1,0 +1,29 @@
+{
+  "name": "artseek-frontend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "react-router-serve ./build/server/index.js",
+    "typecheck": "react-router typegen && tsc"
+  },
+  "dependencies": {
+    "@react-router/serve": "^8.4.0",
+    "isbot": "^5",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router": "latest"
+  },
+  "devDependencies": {
+    "@react-router/dev": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "^5.9.3",
+    "vite": "latest",
+    "vite-tsconfig-paths": "latest"
+  },
+  "packageManager": "pnpm@10.17.1"
+}

@@ -1,0 +1,14 @@
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #201b18;
+  background: #f5f0e8;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+.home-page, .error-page, .page-status { max-width: 72rem; margin: 0 auto; padding: 6rem 2rem; }
+.eyebrow { color: #9b482c; font-size: .8rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+h1 { margin: .5rem 0 1rem; font-family: Georgia, serif; font-size: clamp(3rem, 8vw, 6rem); }
+pre { max-width: 100%; overflow-x: auto; padding: 1rem; background: #fff; }
+.spinner { width: 2rem; height: 2rem; border: 3px solid #d9d0c4; border-top-color: #9b482c; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
