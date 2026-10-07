@@ -5,7 +5,8 @@ import java.util.Arrays;
 
 /** The closed set of art types recognized by the domain. */
 public enum CategoryType {
-    PAINTING("painting");
+    PAINTING("painting"),
+    TATTOO("tattoo");
 
     private final String value;
 
