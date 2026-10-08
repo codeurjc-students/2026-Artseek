@@ -71,6 +71,16 @@ class CategoryRepositoryAdapterIntegrationTests {
     }
 
     @Test
+    void findsUsedCategoryTypesWithoutDuplicates() {
+        categoryRepository.save(new Category("Surrealism", CategoryType.PAINTING));
+        categoryRepository.save(new Category("Impressionism", CategoryType.PAINTING));
+        categoryRepository.save(new Category("Blackwork", CategoryType.TATTOO));
+
+        assertThat(categoryRepository.findUsedTypes())
+                .containsExactly(CategoryType.PAINTING, CategoryType.TATTOO);
+    }
+
+    @Test
     void findsACategoryByNameAndType() {
         categoryRepository.save(new Category("Surrealism", CategoryType.PAINTING));
 

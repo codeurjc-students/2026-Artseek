@@ -53,6 +53,18 @@ class CategoryRepositoryAdapterUnitTests {
     }
 
     @Test
+    void delegatesFindUsedTypesToSpringDataRepository() {
+        List<CategoryType> expectedTypes = List.of(CategoryType.PAINTING, CategoryType.TATTOO);
+        when(springDataCategoryRepository.findUsedTypes()).thenReturn(expectedTypes);
+
+        List<CategoryType> result = categoryRepositoryAdapter.findUsedTypes();
+
+        assertThat(result).isSameAs(expectedTypes);
+        verify(springDataCategoryRepository).findUsedTypes();
+        verifyNoMoreInteractions(springDataCategoryRepository);
+    }
+
+    @Test
     void delegatesFindByNameAndTypeToSpringDataRepository() {
         Category category = new Category("Surrealism", CategoryType.PAINTING);
         Optional<Category> expectedCategory = Optional.of(category);

@@ -29,6 +29,11 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
+    public List<CategoryType> findUsedTypes() {
+        return springCategoryRepository.findUsedTypes();
+    }
+
+    @Override
     public Optional<Category> findByNameAndType(String name, CategoryType type) {
         return springCategoryRepository.findByNameAndType(name, type);
     }

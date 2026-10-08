@@ -12,6 +12,8 @@ public interface CategoryRepository {
 
     List<Category> findByType(CategoryType type);
 
+    List<CategoryType> findUsedTypes();
+
     Optional<Category> findByNameAndType(String name, CategoryType type);
 
     Category save(Category category);
