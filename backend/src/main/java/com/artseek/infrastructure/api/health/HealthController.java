@@ -1,4 +1,4 @@
-package com.artseek.health;
+package com.artseek.infrastructure.api.health;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

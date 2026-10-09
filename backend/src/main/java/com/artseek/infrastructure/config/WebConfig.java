@@ -1,4 +1,4 @@
-package com.artseek.config;
+package com.artseek.infrastructure.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;

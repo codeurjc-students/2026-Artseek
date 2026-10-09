@@ -8,7 +8,15 @@ Spring Boot REST API for Artseek.
 - Maven 3.9+
 - PostgreSQL 16+ with a database and user named `artseek`
 
-## Run
+## Run locally
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+The `local` profile enables `DatabaseInitializer`, which adds the sample categories
+without duplicating rows that already exist. Run without the profile when sample data
+must not be initialized:
 
 ```powershell
 mvn spring-boot:run
