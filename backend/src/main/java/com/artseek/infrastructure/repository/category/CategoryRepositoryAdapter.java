@@ -43,5 +43,8 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
         return springCategoryRepository.save(category);
     }
 
-
+    @Override
+    public void saveAll(List<Category> categories) {
+        springCategoryRepository.saveAll(categories);
+    }
 }

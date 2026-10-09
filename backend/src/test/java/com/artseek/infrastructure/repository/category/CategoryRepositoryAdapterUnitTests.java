@@ -92,4 +92,16 @@ class CategoryRepositoryAdapterUnitTests {
         verify(springDataCategoryRepository).save(category);
         verifyNoMoreInteractions(springDataCategoryRepository);
     }
+
+    @Test
+    void delegatesSaveAllToSpringDataRepository() {
+        List<Category> categories = List.of(
+                new Category("Surrealism", CategoryType.PAINTING),
+                new Category("Blackwork", CategoryType.TATTOO));
+
+        categoryRepositoryAdapter.saveAll(categories);
+
+        verify(springDataCategoryRepository).saveAll(categories);
+        verifyNoMoreInteractions(springDataCategoryRepository);
+    }
 }

@@ -45,6 +45,7 @@ src/main/java/com/artseek/
 
   infrastructure/
     api/                            REST controllers and HTTP concerns
+    bootstrap/                      Application startup and sample-data initialization
     config/                         Spring/framework configuration
     repository/<entity>/            Persistence adapters and Spring Data repositories
 ```
@@ -122,6 +123,23 @@ SpringDataCategoryRepository        Spring Data/JPA mechanism
 Application services depend only on repository ports. They must never import `CategoryRepositoryAdapter` or `SpringDataCategoryRepository`. Spring resolves the adapter because it is a `@Repository` implementing the domain interface.
 
 Use explicit JPQL where derived-query naming cannot clearly express the operation. For example, used category types are obtained with `select distinct` and deterministic ordering.
+
+## Database Initialization
+
+Keep sample-data startup logic in `infrastructure/bootstrap/DatabaseInitializer`. This is an infrastructure concern because it depends on the Spring application lifecycle and writes to persistence.
+
+The accepted initialization approach is:
+
+- Register `DatabaseInitializer` as a Spring `@Service`.
+- Restrict it to the `local` Spring profile with `@Profile("local")`; sample data must not be loaded during ordinary tests or production startup.
+- Inject domain repository ports through constructor injection.
+- Trigger initialization with `@PostConstruct` after Spring has supplied its dependencies.
+- Build domain entities through their validated public constructors.
+- Persist batches through a `saveAll` operation on the domain repository port; the infrastructure adapter delegates to Spring Data JPA.
+- Make initialization idempotent by checking the natural identifying attributes before inserting each sample. Restarting the application must not create another copy of the same sample row.
+- Add future entities' sample data to this centralized bootstrap component, or split it into focused bootstrap collaborators if it grows substantially.
+
+Start the application locally with `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`. Ordinary integration tests do not activate `local`. The dedicated initializer integration test constructs `DatabaseInitializer` with the real repository port and calls `init()` inside its `@Transactional` test, ensuring all inserted sample rows are rolled back afterward. This verifies initializer behavior and persistence integration, while automatic `@PostConstruct` execution remains enabled only during an actual `local` application startup.
 
 Distinguish these concepts:
 
@@ -232,6 +250,8 @@ Use the suffixes `UnitTests` and `IntegrationTests` to make test scope explicit.
 - Make controller integration tests transactional so inserted data rolls back between tests.
 - Controller integration tests must cover successful DTO serialization, filtering/query semantics, and applicable failure status codes.
 - Do not replace required controller integration tests with mocked `@WebMvcTest` tests; keep both when useful.
+- Integration tests must use a separate, controlled test database and create the fixtures required by the behavior under test. The local sample-data initializer stays disabled unless an initializer-specific test explicitly activates the `local` profile.
+- Keep tests independent through transactional rollback or explicit cleanup. Given controlled fixtures and isolation, exact result-size and content assertions are encouraged when they express the operation's contract.
 
 Tests must verify important persistence choices, including generated identifiers, enum-by-name persistence, distinct queries, and exclusion of nonmatching types.
 
@@ -256,3 +276,5 @@ The project targets Java 21. On the current development machine Maven may inheri
 - Shared DTOs are preferred where reuse is expected.
 - Controllers always return `ResponseEntity` and translate domain failures to HTTP statuses.
 - Controllers require both focused web-layer tests and real integration coverage.
+- Sample data is initialized centrally and idempotently through an infrastructure `@Service` using `@Profile("local")`, `@PostConstruct`, and repository-port `saveAll`.
+- Integration tests use a controlled test database; the local initializer is disabled except in its dedicated profile-aware integration test.

@@ -18,5 +18,5 @@ public interface CategoryRepository {
 
     Category save(Category category);
 
-
+    void saveAll(List<Category> categories);
 }
