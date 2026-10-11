@@ -261,7 +261,7 @@ Run the complete backend suite after changes:
 mvn test
 ```
 
-The project targets Java 21. On the current development machine Maven may inherit a JDK 11 `JAVA_HOME`; set `JAVA_HOME` to an installed JDK 21+ before running Maven.
+The project targets the Java version declared in the repository-root `.java-version` file (currently Java 25 LTS). Keep Maven, CI, and local `JAVA_HOME` aligned with that file before running Maven.
 
 ## Current Architectural Decisions Summary
 

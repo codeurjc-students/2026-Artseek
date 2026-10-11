@@ -4,7 +4,7 @@ Spring Boot REST API for Artseek.
 
 ## Requirements
 
-- Java 21
+- Java version declared in the repository's `.java-version` file
 - Maven 3.9+
 - PostgreSQL 16+ with a database and user named `artseek`
 
