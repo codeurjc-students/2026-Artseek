@@ -55,15 +55,10 @@ jobs:
         with:
           package_json_file: frontend/package.json
 
-      - name: Initialize pnpm store
-        run: mkdir -p "$(pnpm store path --silent)"
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install client dependencies
         run: pnpm install --frozen-lockfile
