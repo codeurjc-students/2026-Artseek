@@ -10,7 +10,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(HealthController.class)
-class HealthControllerTests {
+class HealthControllerUnitTests {
     @Autowired
     private MockMvc mockMvc;
 
