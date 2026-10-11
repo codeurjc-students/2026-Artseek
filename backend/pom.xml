@@ -14,7 +14,7 @@
     <name>Artseek backend</name>
     <description>REST API for Artseek</description>
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
     </properties>
     <dependencies>
         <dependency>
