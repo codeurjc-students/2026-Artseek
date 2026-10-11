@@ -1,8 +1,7 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 
-export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? "/new/" : "/",
+export default defineConfig({
   plugins: [reactRouter()],
   resolve: {
     tsconfigPaths: true,
@@ -17,4 +16,4 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-}));
+});
