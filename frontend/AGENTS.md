@@ -19,6 +19,18 @@ Used strictly for asynchronous operations and data that lives on the backend (e.
 *   **What we get:** Automatic caching, request deduplication, background re-fetching, and built-in `isLoading` / `isError` flags without writing a single `useState` or `useEffect`.
 *   **Impact on Artseek:** Searching via embeddings is resource-intensive. Query caches the results of a multimodal search so if a user navigates away and back, the results load instantly from the cache without hitting the pgvector database again.
 
+#### QueryOptions Contract
+
+Follow the [TanStack Query `QueryOptions` reference](https://tanstack.com/query/latest/docs/framework/react/reference/interfaces/QueryOptions) when defining feature queries:
+
+*   Every query needs a stable `queryKey`. TanStack hashes the key for caching and updates the query when the key changes, so include every input that changes the requested server data.
+*   The `queryFn` must resolve to defined data or throw an error. It must never resolve to `undefined`; return a meaningful result object or `null` when a successful endpoint has no response body.
+*   Pass the `AbortSignal` from `QueryFunctionContext` to the underlying request so TanStack Query can cancel work that is no longer needed.
+*   Configure `retry` deliberately for the endpoint. The client default is three retries and the server default is zero; use fewer retries for fast availability checks and avoid retrying errors that cannot recover automatically.
+*   `gcTime` controls how long inactive cached data remains in memory. Its browser default is five minutes. Change it only when the feature's data size or navigation behavior justifies a different lifetime.
+*   `initialData` is persisted in the cache and is stale by default unless paired with an appropriate `staleTime`. Do not use fabricated initial data merely to bypass pending UI.
+*   Keep query options such as retries, cache lifetime, network mode, and metadata in the feature's `hooks/` layer rather than scattering them through routes and components.
+
 ### Zustand (Client State)
 Used strictly for synchronous, shared UI state that only exists in the user's browser. Do not create a store for local component state or until a feature genuinely needs one.
 *   **Examples:** The current JWT token, the open/closed state of the "Upload Artwork" modal, or the user's selected layout preference (Grid vs. Masonry).
@@ -68,7 +80,7 @@ Keep API operations and their TanStack Query hooks inside the feature that owns 
 
 ### Responsibilities
 
-*   **`api/`:** Contains transport-level functions, request and response types that are private to the transport, response validation, and HTTP error handling. Its files must not depend on React or TanStack Query.
+*   **`api/`:** Contains transport-level functions, request and response types that are private to the transport, response validation, and HTTP error handling. Its files must not depend on React or TanStack Query. A function used as a query function must resolve to defined data on success; return a meaningful result object or `null` for an empty response, never `undefined` or `void`.
 *   **`hooks/`:** Contains query keys, query options, and exported TanStack Query hooks. Its files call functions from `api/` and own cache behavior such as retries, stale times, and invalidation.
 *   **Components and routes:** Consume hooks. They must not call `fetch` directly or duplicate query keys.
 

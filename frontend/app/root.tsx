@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react'
 
 import type { Route } from './+types/root'
+import { AppProviders } from './providers'
 import './app.css'
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -30,13 +31,20 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />
+  return (
+    <AppProviders>
+      <Outlet />
+    </AppProviders>
+  )
 }
 
 export function HydrateFallback() {
   return (
-    <main className="page-status" aria-live="polite">
-      <div className="spinner" aria-hidden="true" />
+    <main className="mx-auto max-w-6xl px-8 py-24" aria-live="polite">
+      <div
+        className="size-8 animate-spin rounded-full border-[3px] border-stone-300 border-t-rust"
+        aria-hidden="true"
+      />
       <p>Loading Artseek…</p>
     </main>
   )
@@ -58,11 +66,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="error-page">
+    <main className="mx-auto max-w-6xl px-8 py-24">
       <h1>{message}</h1>
       <p>{details}</p>
       {stack && (
-        <pre>
+        <pre className="max-w-full overflow-x-auto bg-white p-4">
           <code>{stack}</code>
         </pre>
       )}
