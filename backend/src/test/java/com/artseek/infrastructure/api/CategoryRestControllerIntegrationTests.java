@@ -35,7 +35,7 @@ class CategoryRestControllerIntegrationTests {
         categoryRepository.save(new Category("Impressionism", CategoryType.PAINTING));
         categoryRepository.save(new Category("Blackwork", CategoryType.TATTOO));
 
-        mockMvc.perform(get("/api/categories/types/used"))
+        mockMvc.perform(get("/api/1.0/categories/types/used"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].value").value("painting"))
@@ -48,7 +48,7 @@ class CategoryRestControllerIntegrationTests {
         categoryRepository.save(new Category("Impressionism", CategoryType.PAINTING));
         categoryRepository.save(new Category("Blackwork", CategoryType.TATTOO));
 
-        mockMvc.perform(get("/api/categories/painting"))
+        mockMvc.perform(get("/api/1.0/categories/painting"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[*].name", containsInAnyOrder(

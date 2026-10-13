@@ -37,7 +37,7 @@ class CategoryRestControllerUnitTests {
                 new CategoryTypeDTO("painting"),
                 new CategoryTypeDTO("tattoo")));
 
-        mockMvc.perform(get("/api/categories/types/used"))
+        mockMvc.perform(get("/api/1.0/categories/types/used"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].value").value("painting"))
                 .andExpect(jsonPath("$[1].value").value("tattoo"));
@@ -52,7 +52,7 @@ class CategoryRestControllerUnitTests {
                 new CategoryDTO(1L, "Surrealism", "painting"),
                 new CategoryDTO(2L, "Impressionism", "painting")));
 
-        mockMvc.perform(get("/api/categories/painting"))
+        mockMvc.perform(get("/api/1.0/categories/painting"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].name").value("Surrealism"))
@@ -70,7 +70,7 @@ class CategoryRestControllerUnitTests {
         when(findCategoriesByType.execute("sculpture"))
                 .thenThrow(new InvalidCategoryTypeException("sculpture"));
 
-        mockMvc.perform(get("/api/categories/sculpture"))
+        mockMvc.perform(get("/api/1.0/categories/sculpture"))
                 .andExpect(status().isBadRequest());
 
         verify(findCategoriesByType).execute("sculpture");
