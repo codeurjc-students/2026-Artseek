@@ -48,24 +48,26 @@ app/                        # React Router framework-mode source root
 ├── features/               # FEATURE MODULES
 │   ├── auth/               
 │   │   ├── api/
-│   │   │   └── api.ts      # Cohesive API operations (login, register)
-│   │   ├── hooks/
-│   │   │   └── hooks.ts    # TanStack Query hooks for the feature
+│   │   │   └── auth-api.ts # Cohesive API auth operations (login, register)
+│   │   ├── hooks/  # TanStack Query hooks for the feature
+│   │   │   └── auth-hooks.ts
 │   │   ├── components/     # LoginForm, RegisterForm
 │   │   └── store.ts        # Zustand store (JWT, currentUser)
 │   │
 │   ├── search/             
 │   │   ├── api/
-│   │   │   └── api.ts      # semanticSearch(), visualSearch()
+│   │   │   └── artwork-search-api.ts
 │   │   ├── hooks/
-│   │   │   └── hooks.ts    # useSearchQuery() -> wraps TanStack Query
+│   │   │   └── artwork-search-hooks.ts
+│   │   ├── model/
+│   │   │   └── SearchResultDTO.ts
 │   │   └── components/     # SearchBar, ResultGrid
 │   │
 │   └── portfolio/          
 │       ├── api/
-│       │   └── api.ts
+│       │   └── portfolio-api.ts
 │       ├── hooks/
-│       │   └── hooks.ts    # usePortfolioQuery(), useCreateArtworkMutation()
+│       │   └── portfolio-hooks.ts # usePortfolioQuery(), useCreateArtworkMutation()
 │       └── components/     
 │
 └── routes/                 # Lazy-loaded page components that import from features/
@@ -76,12 +78,13 @@ app/                        # React Router framework-mode source root
 
 ## 4. API and Query Hook Design
 
-Keep API operations and their TanStack Query hooks inside the feature that owns them. Every feature that communicates with the backend has an `api/` folder, and every feature exposing TanStack Query hooks has a `hooks/` folder. Keep one cohesive file in each folder while the feature is small rather than creating one file per operation.
+Keep API operations and their TanStack Query hooks inside the feature that owns them. Every feature that communicates with the backend has an `api/` folder, and every feature exposing TanStack Query hooks has a `hooks/` folder. Group files by cohesive resource or workflow: neither one catch-all file per feature nor one file per operation is the default.
 
 ### Responsibilities
 
 *   **`api/`:** Contains transport-level functions, request and response types that are private to the transport, response validation, and HTTP error handling. Its files must not depend on React or TanStack Query. A function used as a query function must resolve to defined data on success; return a meaningful result object or `null` for an empty response, never `undefined` or `void`.
 *   **`hooks/`:** Contains query keys, query options, and exported TanStack Query hooks. Its files call functions from `api/` and own cache behavior such as retries, stale times, and invalidation.
+*   **`model/`:** Contains the feature's API data contracts. Every object received from or sent to the API must have a named model here instead of an inline object type in API, hook, route, or component code.
 *   **Components and routes:** Consume hooks. They must not call `fetch` directly or duplicate query keys.
 
 Do not create global `api/` or `hooks/` directories containing unrelated domains. Cross-cutting HTTP configuration may live in `app/lib` once it is genuinely shared.
@@ -89,15 +92,24 @@ Do not create global `api/` or `hooks/` directories containing unrelated domains
 ### Naming Rules
 
 *   Name feature directories in kebab-case: `backend-status`, `artist-profile`.
-*   Use `api/api.ts` and `hooks/hooks.ts` while a feature is small and cohesive. The directory communicates the architectural role; the single file keeps related operations together.
+*   Name API and hook files after their cohesive resource or workflow using `<resource>-api.ts` and `<resource>-hooks.ts`: `api/category-type-api.ts` and `hooks/category-type-hooks.ts`.
+*   Name API model files and exported types after the backend contract in PascalCase, preserving the `DTO` suffix when present: `model/CategoryTypeDTO.ts` exports `CategoryTypeDTO`.
 *   Name API functions with an operation verb and domain object: `fetchBackendStatus`, `searchArtworks`, `createArtwork`, `updateArtistProfile`, `deleteArtwork`.
 *   Name read hooks `use<Domain>Query`: `useBackendStatusQuery`, `usePortfolioQuery`.
 *   Name write hooks `use<Operation><Domain>Mutation`: `useCreateArtworkMutation`, `useDeleteArtworkMutation`.
 *   Name query-key factories `<domain>Keys`, for example `portfolioKeys`, when a feature has multiple related queries. A single inline key is acceptable for a feature with only one query.
-*   Name React component files and exports in PascalCase. Keep non-component TypeScript filenames lowercase and kebab-case, except for the conventional `api.ts`, `hooks.ts`, and `store.ts` files.
+*   Name React component files and exports in PascalCase. Keep non-component TypeScript filenames lowercase and kebab-case, except for the conventional `store.ts` file and PascalCase DTO model files.
 
 ### When to Split Files
 
-Split the files inside `api/` or `hooks/` only when the feature contains distinct subdomains or a file has become difficult to navigate. When splitting, group by cohesive resource or workflow, such as `api/artworks-api.ts`, `api/artists-api.ts`, or `hooks/artwork-mutations.ts`; do not default to one file per function. File length alone is not a reason to split.
+Start with one API file and one hooks file for each cohesive resource or workflow. Related operations such as `fetchUsedCategoryTypes` and `fetchSupportedCategoryTypes` belong together in `category-type-api.ts`; their query keys and hooks belong together in `category-type-hooks.ts`. This keeps cache identity, invalidation, and related behavior discoverable in one place.
 
-Types used by both API code and components may move to `types.ts`. Types used only by one function should stay next to that function. Add a `store.ts` only for shared client state; server responses remain in TanStack Query.
+Split a resource file when it develops distinct subdomains, substantially different workflows, or independent ownership. A single operation may get its own file when it has meaningful standalone complexity, supporting types, or specialized cache behavior. Do not create one file per function or hook merely for consistency, and do not use file length alone as the reason to split.
+
+This grouping rule applies to behavior. DTO models remain one named file per API contract because they are stable, independently imported data definitions.
+
+API models should be simple TypeScript `interface` or `type` declarations composed of primitives, arrays, and other named models. Do not use classes, methods, client state, or behavior in DTO models. Keep transport validation and mapping in `api/`.
+
+Choose feature boundaries by cohesive product domain, not one feature per backend DTO. Closely related contracts with limited independent behavior belong together; for example, `CategoryTypeDTO` belongs in `features/categories/model/` because category types are part of the categories domain and do not justify a separate feature.
+
+Add a `store.ts` only for shared client state; server responses remain in TanStack Query.
