@@ -58,7 +58,7 @@ class CategoryRestControllerIntegrationTests {
 
     @Test
     void returnsBadRequestForAnInvalidCategoryType() throws Exception {
-        mockMvc.perform(get("/api/categories/sculpture"))
+        mockMvc.perform(get("/api/1.0/categories/sculpture"))
                 .andExpect(status().isBadRequest());
     }
 }
