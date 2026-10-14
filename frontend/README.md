@@ -1,6 +1,10 @@
 # Artseek frontend
 
-React SPA built with Vite and React Router framework mode.
+React SPA built with Vite, React Router framework mode, TanStack Query, and Tailwind CSS.
+
+The source follows a feature-driven structure under `app/features`. Backend state
+belongs in TanStack Query hooks; add a client-state store only when shared UI state
+actually requires one.
 
 ## Requirements
 

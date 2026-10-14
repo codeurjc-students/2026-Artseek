@@ -11,16 +11,21 @@
   },
   "dependencies": {
     "@react-router/serve": "^8.4.0",
+    "@tanstack/react-query": "^5.104.2",
+    "bootstrap": "^5.3.8",
     "isbot": "^5",
     "react": "latest",
+    "react-bootstrap": "^2.10.10",
     "react-dom": "latest",
     "react-router": "latest"
   },
   "devDependencies": {
     "@react-router/dev": "latest",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "latest",
     "vite-tsconfig-paths": "latest"
