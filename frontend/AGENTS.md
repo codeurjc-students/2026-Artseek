@@ -8,6 +8,7 @@ This document outlines the architectural decisions for the Artseek frontend, tra
 *   **Routing:** React Router (SPA navigation)
 *   **Server State Management:** TanStack Query (React Query)
 *   **Client State Management:** Zustand, only when shared client state is needed
+*   **Component Library:** React-Bootstrap with Bootstrap 5
 *   **Styling:** Tailwind CSS
 
 ## 2. Server State vs. Client State
@@ -113,3 +114,20 @@ API models should be simple TypeScript `interface` or `type` declarations compos
 Choose feature boundaries by cohesive product domain, not one feature per backend DTO. Closely related contracts with limited independent behavior belong together; for example, `CategoryTypeDTO` belongs in `features/categories/model/` because category types are part of the categories domain and do not justify a separate feature.
 
 Add a `store.ts` only for shared client state; server responses remain in TanStack Query.
+
+## 5. React-Bootstrap and Navigation
+
+Use React-Bootstrap components for standard interface elements such as lists, buttons, alerts, forms, navigation, and loading indicators instead of rebuilding equivalent components with raw markup. Import Bootstrap's stylesheet once in `app/root.tsx`; feature and route files must not import it again.
+
+React-Bootstrap does not replace React Router. Use React Router's `Link` for internal SPA navigation so navigation does not reload the document. When a Bootstrap component should navigate, compose it with `Link` through its `as` prop:
+
+```tsx
+import ListGroup from 'react-bootstrap/ListGroup'
+import { Link } from 'react-router'
+
+<ListGroup.Item as={Link} to="/category/painting" action>
+  Painting
+</ListGroup.Item>
+```
+
+Use ordinary anchors only for external destinations, downloads, or protocols handled outside the SPA. Keep routing concerns in routes and navigation components; feature API and hook modules must not depend on React Router or React-Bootstrap.

@@ -12,8 +12,10 @@
   "dependencies": {
     "@react-router/serve": "^8.4.0",
     "@tanstack/react-query": "^5.104.2",
+    "bootstrap": "^5.3.8",
     "isbot": "^5",
     "react": "latest",
+    "react-bootstrap": "^2.10.10",
     "react-dom": "latest",
     "react-router": "latest"
   },

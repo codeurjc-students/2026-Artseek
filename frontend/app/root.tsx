@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 
 import type { Route } from './+types/root'
 import { AppProviders } from './providers'
+import 'bootstrap/dist/css/bootstrap.min.css'
 import './app.css'
 
 export function Layout({ children }: { children: ReactNode }) {

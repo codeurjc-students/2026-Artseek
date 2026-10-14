@@ -1,3 +1,8 @@
+import Alert from 'react-bootstrap/Alert'
+import ListGroup from 'react-bootstrap/ListGroup'
+import Spinner from 'react-bootstrap/Spinner'
+import { Link } from 'react-router'
+
 import { useUsedCategoryTypesQuery } from '../features/categories/hooks/category-type-hooks'
 import type { Route } from './+types/HomeRoute'
 
@@ -25,25 +30,32 @@ export default function Home() {
         <h2 id="category-types-heading">Categories</h2>
 
         {categoryTypes.isPending && (
-          <p role="status">Loading categories…</p>
+          <Spinner animation="border" role="status" aria-label="Loading categories" />
         )}
 
         {categoryTypes.isError && (
-          <p role="alert">
+          <Alert variant="danger">
             Categories are unavailable right now. Please try again later.
-          </p>
+          </Alert>
         )}
 
         {categoryTypes.isSuccess && categoryTypes.data.length === 0 && (
-          <p role="status">No categories are currently available.</p>
+          <Alert variant="secondary">No categories are currently available.</Alert>
         )}
 
         {categoryTypes.isSuccess && categoryTypes.data.length > 0 && (
-          <ul>
+          <ListGroup>
             {categoryTypes.data.map((categoryType) => (
-              <li key={categoryType.value}>{categoryType.value}</li>
+              <ListGroup.Item
+                action
+                as={Link}
+                key={categoryType.value}
+                to={`/category/${encodeURIComponent(categoryType.value)}`}
+              >
+                {categoryType.value}
+              </ListGroup.Item>
             ))}
-          </ul>
+          </ListGroup>
         )}
       </section>
     </main>
