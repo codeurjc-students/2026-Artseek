@@ -15,6 +15,9 @@
     <description>REST API for Artseek</description>
     <properties>
         <java.version>25</java.version>
+        <openapi-generator.version>7.17.0</openapi-generator.version>
+        <springdoc-openapi.version>3.0.0</springdoc-openapi.version>
+        <springdoc-openapi-maven-plugin.version>1.5</springdoc-openapi-maven-plugin.version>
     </properties>
     <dependencies>
         <dependency>
@@ -28,6 +31,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc-openapi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -75,4 +83,105 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>openapi</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>start-for-openapi-export</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>stop-after-openapi-export</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.springdoc</groupId>
+                        <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                        <version>${springdoc-openapi-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>export-openapi-yaml</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>generate</goal>
+                                </goals>
+                                <configuration>
+                                    <apiDocsUrl>http://localhost:8080/v3/api-docs.yaml</apiDocsUrl>
+                                    <outputDir>${project.basedir}/../docs/api</outputDir>
+                                    <outputFileName>api-docs.yaml</outputFileName>
+                                    <failOnError>true</failOnError>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.openapitools</groupId>
+                        <artifactId>openapi-generator-maven-plugin</artifactId>
+                        <version>${openapi-generator.version}</version>
+                        <executions>
+                            <execution>
+                                <id>generate-openapi-html</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>generate</goal>
+                                </goals>
+                                <configuration>
+                                    <inputSpec>${project.basedir}/../docs/api/api-docs.yaml</inputSpec>
+                                    <generatorName>html</generatorName>
+                                    <output>${project.build.directory}/generated-openapi-html</output>
+                                    <addCompileSourceRoot>false</addCompileSourceRoot>
+                                    <skipValidateSpec>true</skipValidateSpec>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>publish-openapi-html</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <copy
+                                            file="${project.build.directory}/generated-openapi-html/index.html"
+                                            tofile="${project.basedir}/../docs/api/api-docs.html" />
+                                        <replaceregexp
+                                            file="${project.basedir}/../docs/api/api-docs.html"
+                                            match="[ \t]+$"
+                                            replace=""
+                                            byline="true" />
+                                        <replaceregexp
+                                            file="${project.basedir}/../docs/api/api-docs.html"
+                                            match=".*Contact Info:.*"
+                                            replace=""
+                                            byline="true" />
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
