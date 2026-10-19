@@ -1,7 +1,8 @@
-package com.artseek.application.usecase.category.findbytype;
+package com.artseek.application.category.findbytype;
 
+import com.artseek.application.category.CategoryDTO;
 import com.artseek.application.mediator.Query;
-import com.artseek.application.usecase.category.CategoryDTO;
+
 import java.util.List;
 
 public record FindCategoriesByTypeQuery(String type) implements Query<List<CategoryDTO>> {

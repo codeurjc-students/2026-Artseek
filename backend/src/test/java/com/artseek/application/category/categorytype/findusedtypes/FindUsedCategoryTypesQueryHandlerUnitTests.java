@@ -1,4 +1,4 @@
-package com.artseek.application.usecase.category.categorytype.findusedtypes;
+package com.artseek.application.category.categorytype.findusedtypes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -6,7 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.artseek.application.usecase.category.categorytype.CategoryTypeDTO;
+import com.artseek.application.category.categorytype.CategoryTypeDTO;
+import com.artseek.application.category.categorytype.findusedtypes.FindUsedCategoryTypesQuery;
+import com.artseek.application.category.categorytype.findusedtypes.FindUsedCategoryTypesQueryHandler;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import java.util.ArrayList;

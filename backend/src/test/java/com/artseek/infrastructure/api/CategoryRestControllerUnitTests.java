@@ -7,13 +7,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.artseek.application.category.CategoryDTO;
+import com.artseek.application.category.categorytype.CategoryTypeDTO;
+import com.artseek.application.category.categorytype.findusedtypes.FindUsedCategoryTypesQuery;
+import com.artseek.application.category.findbytype.FindCategoriesByTypeQuery;
 import com.artseek.application.mediator.Mediator;
-import com.artseek.application.usecase.category.CategoryDTO;
-import com.artseek.application.usecase.category.categorytype.CategoryTypeDTO;
-import com.artseek.application.usecase.category.categorytype.findusedtypes.FindUsedCategoryTypesQuery;
-import com.artseek.application.usecase.category.categorytype.findusedtypes.FindUsedCategoryTypesUseCase;
-import com.artseek.application.usecase.category.findbytype.FindCategoriesByTypeQuery;
-import com.artseek.application.usecase.category.findbytype.FindCategoriesByTypeUseCase;
 import com.artseek.domain.exceptions.category.InvalidCategoryTypeException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -31,12 +29,6 @@ class CategoryRestControllerUnitTests {
     @MockitoBean
     private Mediator mediator;
 
-    @MockitoBean
-    private FindUsedCategoryTypesUseCase findUsedCategoryTypes;
-
-    @MockitoBean
-    private FindCategoriesByTypeUseCase findCategoriesByType;
-
     @Test
     void returnsUsedCategoryTypes() throws Exception {
         FindUsedCategoryTypesQuery query = new FindUsedCategoryTypesQuery();
@@ -50,7 +42,7 @@ class CategoryRestControllerUnitTests {
                 .andExpect(jsonPath("$[1].value").value("tattoo"));
 
         verify(mediator).send(query);
-        verifyNoMoreInteractions(mediator, findUsedCategoryTypes, findCategoriesByType);
+        verifyNoMoreInteractions(mediator);
     }
 
     @Test
@@ -70,7 +62,7 @@ class CategoryRestControllerUnitTests {
                 .andExpect(jsonPath("$[1].type").value("painting"));
 
         verify(mediator).send(query);
-        verifyNoMoreInteractions(mediator, findUsedCategoryTypes, findCategoriesByType);
+        verifyNoMoreInteractions(mediator);
     }
 
     @Test
@@ -83,6 +75,6 @@ class CategoryRestControllerUnitTests {
                 .andExpect(status().isBadRequest());
 
         verify(mediator).send(query);
-        verifyNoMoreInteractions(mediator, findUsedCategoryTypes, findCategoriesByType);
+        verifyNoMoreInteractions(mediator);
     }
 }

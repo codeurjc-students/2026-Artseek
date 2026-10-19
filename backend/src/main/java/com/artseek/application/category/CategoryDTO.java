@@ -1,4 +1,4 @@
-package com.artseek.application.usecase.category;
+package com.artseek.application.category;
 
 import com.artseek.domain.model.category.Category;
 

@@ -1,7 +1,7 @@
-package com.artseek.application.usecase.category.findbytype;
+package com.artseek.application.category.findbytype;
 
+import com.artseek.application.category.CategoryDTO;
 import com.artseek.application.mediator.QueryHandler;
-import com.artseek.application.usecase.category.CategoryDTO;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import java.util.List;
