@@ -7,10 +7,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.artseek.application.usecase.category.CategoryDTO;
-import com.artseek.application.usecase.category.categorytype.CategoryTypeDTO;
-import com.artseek.application.usecase.category.categorytype.findusedtypes.FindUsedCategoryTypesUseCase;
-import com.artseek.application.usecase.category.findbytype.FindCategoriesByTypeUseCase;
+import com.artseek.application.category.CategoryDTO;
+import com.artseek.application.category.categorytype.CategoryTypeDTO;
+import com.artseek.application.category.categorytype.findusedtypes.FindUsedCategoryTypesQuery;
+import com.artseek.application.category.findbytype.FindCategoriesByTypeQuery;
+import com.artseek.application.mediator.Mediator;
 import com.artseek.domain.exceptions.category.InvalidCategoryTypeException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,14 +27,12 @@ class CategoryRestControllerUnitTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private FindUsedCategoryTypesUseCase findUsedCategoryTypes;
-
-    @MockitoBean
-    private FindCategoriesByTypeUseCase findCategoriesByType;
+    private Mediator mediator;
 
     @Test
     void returnsUsedCategoryTypes() throws Exception {
-        when(findUsedCategoryTypes.execute()).thenReturn(List.of(
+        FindUsedCategoryTypesQuery query = new FindUsedCategoryTypesQuery();
+        when(mediator.send(query)).thenReturn(List.of(
                 new CategoryTypeDTO("painting"),
                 new CategoryTypeDTO("tattoo")));
 
@@ -42,13 +41,14 @@ class CategoryRestControllerUnitTests {
                 .andExpect(jsonPath("$[0].value").value("painting"))
                 .andExpect(jsonPath("$[1].value").value("tattoo"));
 
-        verify(findUsedCategoryTypes).execute();
-        verifyNoMoreInteractions(findUsedCategoryTypes, findCategoriesByType);
+        verify(mediator).send(query);
+        verifyNoMoreInteractions(mediator);
     }
 
     @Test
     void returnsCategoriesFilteredByType() throws Exception {
-        when(findCategoriesByType.execute("painting")).thenReturn(List.of(
+        FindCategoriesByTypeQuery query = new FindCategoriesByTypeQuery("painting");
+        when(mediator.send(query)).thenReturn(List.of(
                 new CategoryDTO(1L, "Surrealism", "painting"),
                 new CategoryDTO(2L, "Impressionism", "painting")));
 
@@ -61,19 +61,20 @@ class CategoryRestControllerUnitTests {
                 .andExpect(jsonPath("$[1].name").value("Impressionism"))
                 .andExpect(jsonPath("$[1].type").value("painting"));
 
-        verify(findCategoriesByType).execute("painting");
-        verifyNoMoreInteractions(findUsedCategoryTypes, findCategoriesByType);
+        verify(mediator).send(query);
+        verifyNoMoreInteractions(mediator);
     }
 
     @Test
     void returnsBadRequestForAnInvalidCategoryType() throws Exception {
-        when(findCategoriesByType.execute("sculpture"))
+        FindCategoriesByTypeQuery query = new FindCategoriesByTypeQuery("sculpture");
+        when(mediator.send(query))
                 .thenThrow(new InvalidCategoryTypeException("sculpture"));
 
         mockMvc.perform(get("/api/1.0/categories/sculpture"))
                 .andExpect(status().isBadRequest());
 
-        verify(findCategoriesByType).execute("sculpture");
-        verifyNoMoreInteractions(findUsedCategoryTypes, findCategoriesByType);
+        verify(mediator).send(query);
+        verifyNoMoreInteractions(mediator);
     }
 }

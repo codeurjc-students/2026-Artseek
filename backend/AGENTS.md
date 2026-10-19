@@ -232,30 +232,29 @@ GET /api/categories/{type}        Categories filtered by type
 
 Local exception handling in a controller is acceptable for the current scope. If error handling becomes repetitive, introduce a shared `@RestControllerAdvice` with consistent error DTOs rather than duplicating `try/catch` blocks.
 
-## Testing Policy
+## Tests
 
-Use the suffixes `UnitTests` and `IntegrationTests` to make test scope explicit.
+Keep separate `<Class>UnitTests` and `<Class>IntegrationTests` classes in matching packages under `src/test/java`.
 
-### Unit tests
+System tests use the suffix `SystemTests` and mirror their controller's production package under `src/test/java`, alongside its other tests. For example, `HealthEndpointSystemTests` belongs in `com/artseek/infrastructure/api/health`, matching `HealthController` under `src/main/java`.
 
-- Domain tests instantiate entities directly and verify invariants and exception data.
-- Application service unit tests mock repository ports and verify orchestration, validation, DTO mapping, and that invalid input does not access persistence.
-- Repository adapter unit tests mock the Spring Data repository and verify delegation.
-- Controller unit/web-slice tests use `@WebMvcTest`, mocked use-case ports, and `MockMvc` to verify routing, status codes, JSON shapes, and delegation.
+| Subject | Unit tests | Integration tests |
+| --- | --- | --- |
+| Domain | Plain JUnit; construct entities directly | Only when persistence behavior needs verification |
+| Handlers / application services | `MockitoExtension`, mocked repository ports, direct construction or `@InjectMocks` | `@DataJpaTest` + `@Import` of the handler/service and real repository adapter; Spring Data JPA and H2 |
+| Repository adapters | Mock Spring Data and verify delegation | `@DataJpaTest` + `@Import` of the real adapter |
+| REST controllers | `@WebMvcTest` + `MockMvc`; `@MockitoBean` for all constructor dependencies, stubbing/verifying `Mediator.send()` or `dispatch()` where used | **Required:** `@SpringBootTest` + `@AutoConfigureMockMvc` + `@Transactional`; real mediator, handlers, adapters, and test database |
+| Mediator | Construct directly with explicit sample-handler lists; no Spring context | Add separately when verifying Spring wiring |
 
-### Integration tests
+- Field `@Autowired` is acceptable in Spring tests: the test framework owns their lifecycle and dependency setup. Production classes use constructor injection with `final` fields to make required dependencies explicit and allow plain Java construction. `@Autowired` itself is not forbidden; a single production constructor does not need the annotation.
+- Handler unit tests cover query/command type registration, DTO mapping, empty results, validation, rejected-input exception data, and absence of repository calls for invalid input. Verify immutable snapshots where that is part of the output contract.
+- Handler integration tests verify persistence-backed behavior: generated IDs in DTOs, filtering, distinct/order semantics, and exclusion of supported-but-unused types. Controller tests verify routing, JSON, delegation, and semantic HTTP errors.
+- Use controlled test databases and explicit fixtures, never the development/production database. Exact result assertions are appropriate; do not assume generated IDs or unspecified ordering.
+- `@DataJpaTest` rolls back after each test by default. Full-context tests need `@Transactional` for rollback of same-thread writes; startup hooks execute before that transaction. Keep `local` disabled and test the initializer by constructing it and calling `init()` within the test transaction.
+- Sample mediator requests/handlers must be private nested types without Spring annotations. Explicit test registries exclude production handlers; test fixtures must never register with the real mediator.
+- HTTP system tests follow `HealthEndpointSystemTests`: `@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)`, `@AutoConfigureRestTestClient`, and an injected `RestTestClient` making requests through the running HTTP server. Verify public endpoint behavior with real application wiring. Server-side writes run outside the test thread's transaction, so arrange explicit cleanup for mutating system tests rather than relying on test-level `@Transactional` rollback.
 
-- Repository adapter integration tests use `@DataJpaTest`, the real adapter, Spring Data JPA, and H2.
-- **Every controller must have integration tests.** Controller integration tests use `@SpringBootTest`, `@AutoConfigureMockMvc`, real application services, the real repository adapter, JPA, and H2.
-- Make controller integration tests transactional so inserted data rolls back between tests.
-- Controller integration tests must cover successful DTO serialization, filtering/query semantics, and applicable failure status codes.
-- Do not replace required controller integration tests with mocked `@WebMvcTest` tests; keep both when useful.
-- Integration tests must use a separate, controlled test database and create the fixtures required by the behavior under test. The local sample-data initializer stays disabled unless an initializer-specific test explicitly activates the `local` profile.
-- Keep tests independent through transactional rollback or explicit cleanup. Given controlled fixtures and isolation, exact result-size and content assertions are encouraged when they express the operation's contract.
-
-Tests must verify important persistence choices, including generated identifiers, enum-by-name persistence, distinct queries, and exclusion of nonmatching types.
-
-Run the complete backend suite after changes:
+Run the complete backend suite after code/test changes:
 
 ```powershell
 mvn test
@@ -277,4 +276,4 @@ The project targets the Java version declared in the repository-root `.java-vers
 - Controllers always return `ResponseEntity` and translate domain failures to HTTP statuses.
 - Controllers require both focused web-layer tests and real integration coverage.
 - Sample data is initialized centrally and idempotently through an infrastructure `@Service` using `@Profile("local")`, `@PostConstruct`, and repository-port `saveAll`.
-- Integration tests use a controlled test database; the local initializer is disabled except in its dedicated profile-aware integration test.
+- Integration tests use a controlled test database; the initializer test invokes `init()` manually within its rollback transaction.
