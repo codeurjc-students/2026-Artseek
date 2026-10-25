@@ -100,3 +100,16 @@ AI-generated material is treated as a design and development aid. All proposals 
 - **How it was used:** Codex updated `backend/pom.xml` with the Springdoc OpenAPI dependency and the Maven plugins required to export the API specification and generate its HTML documentation.
 - **Complementary tools and resources:** Springdoc OpenAPI, OpenAPI Generator, Maven, and local file editing were used.
 - **Result:** The backend could generate `docs/api/api-docs.yaml` and `docs/api/api-docs.html` through its Maven OpenAPI profile.
+
+## AI-2026-10-25-001 — Frontend data-loading architecture refactor
+
+- **Date:** 25 October 2026.
+- **Phase:** Frontend architecture and data loading.
+- **Objective:** Refactor the initial API/hooks data-loading pattern into a centralized TanStack Query client combined with React Router client loaders.
+- **Tool:** OpenAI Codex, desktop application.
+- **Specific version/model:** GPT-6.1 Sol.
+- **Configuration:** `high` reasoning level, agentic Default mode, interactive chat workflow.
+- **Context provided by the student:** Codex was given the existing TanStack Query integration, frontend routes, and the architectural rules documented in `frontend/README.md` and `frontend/AGENTS.md`.
+- **How it was used:** Codex reorganized frontend data loading around a single shared `QueryClient`. Route-level client loaders became responsible for requesting and caching the data required before rendering, replacing the initial feature API/hooks consumption pattern with a consistent loader-based flow for request execution, cache reuse, navigation, and error handling.
+- **Complementary tools and resources:** TanStack Query, React Router client loaders, React, TypeScript, and local file editing were used. No external plugins, skills, MCP servers, or connectors are recorded for this use.
+- **Result and student review:** The frontend gained a centralized query-client and client-loader architecture for current and future routes, superseding the initial API/hooks pattern recorded on 13 October 2026.
