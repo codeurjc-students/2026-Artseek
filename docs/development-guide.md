@@ -41,7 +41,7 @@ The backend dependencies are declared in [`backend/pom.xml`](../backend/pom.xml)
 | [PostgreSQL](https://www.postgresql.org/docs/17/) 17 | Stores categories in the local development database. Hibernate currently updates the schema through `spring.jpa.hibernate.ddl-auto=update`. |
 | [React](https://react.dev/) 19.3.0 and [TypeScript](https://www.typescriptlang.org/) 5.9.3 | Define the frontend components and typed API contracts. TypeScript is compiled to JavaScript for the browser. |
 | [React Router](https://reactrouter.com/) 8.4.0 | Defines the home, category and health routes. Framework mode is configured with `ssr: false`, so the application runs as a client SPA. |
-| [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) 5.104.2 | Manages asynchronous backend data, query keys, caching, loading and error states, cancellation and retries. |
+| [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) 5.104.2 | Provides the shared server-data cache, query keys, request deduplication, cancellation support and retries. Client loaders use the cache; React Router coordinates route loading and errors. |
 | [React-Bootstrap](https://react-bootstrap.github.io/) 2.10.10, [Bootstrap](https://getbootstrap.com/) 5.3.8 and [Tailwind CSS](https://tailwindcss.com/) 4.3.3 | Provide interface components and styling. Bootstrap's stylesheet is imported once in the application root. |
 
 [Apache Kafka](https://kafka.apache.org/intro) is selected for the planned asynchronous communication between the artwork and AI analysis contexts in both deployment options. Kafka and the analysis component are not yet configured in the repository. Analysis will call an external AI model API; the provider, model and deployment configuration remain to be defined.
@@ -143,13 +143,26 @@ Controllers depend on the application `Mediator` contract. `FindUsedCategoryType
 
 ### Frontend structure
 
-The frontend groups backend communication by feature under `app/features/`:
+The frontend groups backend communication by feature under `app/features/`. Route data follows this flow:
 
 ```text
-Route/component -> TanStack Query hook -> API function -> REST API
+clientLoader -> shared QueryClient + feature query options -> API function -> REST API
+clientLoader result -> loaderData -> route component
 ```
 
-The `categories` feature contains API functions, query hooks and named DTO models. The `backend-status` feature checks backend availability. API functions use `fetch`, pass the query's abort signal, reject unsuccessful HTTP responses and validate category response shapes. Hooks own query keys and retry settings; route components render loading, error, empty and success states. [`AppProviders`](../frontend/app/providers.tsx) supplies a shared `QueryClient`.
+The `categories` feature contains HTTP functions in `api/`, query keys and options factories in `queries/`, and named API contracts in `model/`. Group related operations by resource: `category-type-api.ts` and `category-type-queries.ts` contain category-type operations; category types remain part of the categories feature. DTOs such as `CategoryTypeDTO` have their own model files and use simple TypeScript types, not classes. The `backend-status` feature checks backend availability. API functions use `fetch`, pass the query's abort signal, reject unsuccessful HTTP responses and validate category response shapes.
+
+Export one browser-lifetime `queryClient` from `app/lib/query-client.ts`. Each route's `clientLoader` imports that instance, awaits `queryClient.query(...)` with feature query options, and returns data rendered through typed `Route.ComponentProps.loaderData`. Do not create a client per route or add a query hook just to read the same data again. Path parameters such as `params.categoryType` are loader inputs and must also be included in the query key.
+
+Category and used-category-type options use `staleTime: 60_000`; health uses `staleTime: 0` to check availability on each visit. All three use `retry: 1`. Loaders can execute again during navigation while reusing a fresh cache entry without another HTTP request. Missing, stale or invalidated data is fetched when the loader next queries it. Cache entries remain subject to garbage collection; freshness does not guarantee indefinite retention.
+
+`loaderData` is a snapshot, not a cache subscription. This design provides cache reuse, deduplication, retries and targeted invalidation, but does not automatically refresh an open page when the cache changes. Initial loading uses the root `HydrateFallback`; pending navigations use root-level `useNavigation` feedback. Unexpected loading errors reach the single `root.tsx` error boundary rather than route-specific boundaries. The health loader handles unavailable-backend failures explicitly, returning `backendStatus: null` for the health page's status message. Successful empty category responses render empty states.
+
+Use `useActionState` for straightforward form submissions and validation results, calling feature API functions from the action. After a successful write, invalidate affected keys on the shared client and revalidate the route or navigate when its displayed loader data must be refreshed. Invalidation alone does not replace a rendered snapshot.
+
+Add custom query hooks only for reactive component needs such as live cache updates, polling or component-driven queries; add mutation hooks when writes need capabilities such as optimistic updates or coordinated mutation state. These hooks belong in the feature's optional `hooks/` folder and reuse its query options. When hooks are needed, a `QueryClientProvider` must expose the **same imported client instance used by loaders**, not a second client. Loaders access the client directly, not through React context; loader-only queries do not require the provider. Keep Zustand reserved for genuinely shared browser-only state and do not create a store for the current pages.
+
+The [frontend architecture standard](../frontend/AGENTS.md) contains the full responsibilities and naming rules. The component-library choice and existing styles are unchanged by this data-loading design.
 
 [`app/routes.ts`](../frontend/app/routes.ts) defines `/` for used category types, `/category/:categoryType` for categories of a selected type, and `/health` for backend availability. React Router links preserve SPA navigation.
 
@@ -385,7 +398,7 @@ To run a particular class, use `mvn test "-Dtest=CategoryUnitTests"`. Maven Sure
 
 Once the planned JaCoCo integration is implemented, `mvn verify` from `backend/` will also generate the coverage reports described under [planned static analysis and coverage](#planned-static-analysis-and-coverage). The current Maven configuration does not generate those reports yet.
 
-From `frontend/`, run `pnpm typecheck` and `pnpm build` after installing dependencies. The frontend currently has no automated test command or configured browser-test suite. The routes can be checked manually using the category and health pages, including their unavailable-backend states.
+From `frontend/`, run `pnpm typecheck` and `pnpm build` after installing dependencies. The frontend currently has no automated test command or configured browser-test suite. Manually check category navigation, empty responses, root error handling, navigation loading feedback, and the health page's unavailable-backend state. With the loader-based design, use the browser's network tools to check that returning to a category page within its freshness window reuses cached data, stale or invalidated entries fetch on the next loader execution, different category types use separate entries, and every health-page visit checks backend availability. Do not expect an already-rendered loader snapshot to update merely because its cache entry changes.
 
 ## Creating a release
 
