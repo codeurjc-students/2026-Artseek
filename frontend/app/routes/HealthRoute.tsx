@@ -1,5 +1,16 @@
 import type { Route } from './+types/HealthRoute'
-import { useBackendStatusQuery } from '../features/backend-status/hooks/hooks'
+import { backendStatusQueryOptions } from '../features/backend-status/queries/backend-status-queries'
+import { queryClient } from '../lib/query-client'
+
+export async function clientLoader() {
+  try {
+    const backendStatus = await queryClient.query(backendStatusQueryOptions())
+    return { backendStatus }
+  } catch {
+    // Failure is a diagnostic result here, not a reason to hide the page.
+    return { backendStatus: null }
+  }
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -8,14 +19,12 @@ export function meta({}: Route.MetaArgs) {
   ]
 }
 
-export default function Health() {
-  const backendStatus = useBackendStatusQuery()
+export default function Health({ loaderData }: Route.ComponentProps) {
+  const { backendStatus } = loaderData
 
-  const statusMessage = backendStatus.isPending
-    ? 'Connecting to the backend…'
-    : backendStatus.isError
-      ? 'Backend unavailable'
-      : 'Backend is up and running'
+  const statusMessage = backendStatus === null
+    ? 'Backend unavailable'
+    : 'Backend is up and running'
 
   return (
     <main>
