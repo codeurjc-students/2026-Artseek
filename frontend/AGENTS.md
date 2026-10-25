@@ -153,3 +153,42 @@ import { Link } from 'react-router'
 ```
 
 Use ordinary anchors only for external destinations, downloads, or protocols handled outside the SPA. Keep routing concerns in routes and navigation components; feature API and query modules must not depend on React Router or React-Bootstrap.
+
+## 6. Unit Testing
+
+Use Vitest with React Testing Library, jest-dom matchers, and jsdom. Run commands from `frontend/`:
+
+```powershell
+pnpm test          # Complete suite once; exits nonzero on failure
+pnpm test:watch    # Watch mode for development
+pnpm typecheck
+pnpm build
+```
+
+### Test Structure and Naming
+
+*   Keep unit tests under `test/`, mirroring the source directories under `app/`. For example, `app/features/categories/api/category-api.ts` is tested by `test/features/categories/api/category-api.test.ts`, and `app/routes/CategoryRoute.tsx` by `test/routes/CategoryRoute.test.tsx`.
+*   Use `.test.ts` for API and query tests and `.test.tsx` for rendered behavior. Shared root behavior belongs in `test/root.test.tsx`.
+*   Keep global setup and cleanup in `test/setup.ts`. Keep cross-cutting helpers, such as mocked fetch access and deferred promises, in `test/test-utils.ts`.
+
+### Fixtures and Route Helpers
+
+Organize shared test data by cohesion and reuse. These are project conventions; a separate fixture file for every model is not required.
+
+*   Keep `test/fixtures.ts` while it contains only a few small, related collections. Avoid turning it into a repository-wide collection of unrelated feature data.
+*   As fixtures grow across features, move reusable model data into the mirrored feature's `model/` directory under `test/`. Use kebab-case `<model-name>-fixtures.ts`, for example `test/features/categories/model/category-fixtures.ts` and `category-type-fixtures.ts`.
+*   Create model fixture files only when tests need reusable examples. Keep unusual or single-test inputs inline. Type shared fixtures with the application's model contracts, and create independent copies when a test needs to mutate data.
+*   Route prop and loader-argument builders belong under `test/routes/`. Prefer `route-test-utils.ts` for these helpers when creating or reorganizing them; the existing `route-fixtures.ts` currently serves this purpose.
+*   Keep small, related route builders together. Split into route-specific helper files when their setup develops substantial independent behavior, rather than automatically creating one file per route.
+
+### Coverage and Isolation
+
+*   Exercise the existing architecture: API functions, query-option factories, client loaders, and components rendering returned `loaderData`. Do not introduce query subscription hooks or a `QueryClientProvider` for loader-based tests.
+*   Cover successful data loading and display, empty collections where applicable, HTTP/network failures, and pending UI. Test initial hydration, pending navigation, and loader error propagation at the shared root. Preserve diagnostic behavior such as the health loader returning `null` on failure.
+*   Verify meaningful query behavior such as cache reuse, parameter-specific keys, stale or invalidated data, retries, and cancellation where relevant.
+*   Mock requests so tests run without a backend, database, or development server. Use `mockFetch()` and `deferred()` from `test/test-utils.ts` for deterministic responses and pending states.
+*   Preserve the setup's per-test fetch replacement, shared QueryClient reset, DOM cleanup, and mock/global restoration. Retry delays may be removed for speed while preserving feature retry counts.
+*   Return a fresh `Response` for each request that reads JSON; response bodies can only be consumed once. Avoid tests that depend on execution order or data left by another test.
+*   Prefer accessible-role and visible-text assertions. Add tests for observable behavior and meaningful regressions rather than mirroring implementation details or relying on snapshots alone.
+
+Both frontend CI jobs must run `pnpm test` alongside type checking and production building. Preserve the PR job's exact name, **Frontend test suite**, because the active `main` ruleset requires it for merging. See [the frontend testing guide](README.md#unit-tests) for examples and focused test commands.

@@ -25,7 +25,7 @@ The planned architecture also includes a separate context for AI artwork analysi
 | Type | Web SPA and REST API, with one backend application and one relational database. |
 | Technologies | React, TypeScript, React Router, TanStack Query, React-Bootstrap, Bootstrap and Tailwind CSS; Java, Spring Boot, Spring Data JPA and PostgreSQL. |
 | Tools | Visual Studio Code with Spring Boot extensions, IntelliJ IDEA, Git, GitHub, Maven, Node.js, pnpm, Vite, Docker, Postman and OpenAPI tooling. |
-| Quality control | Backend unit, integration and HTTP system tests; frontend TypeScript checks and production builds; GitHub Actions and required checks before merging. SonarQube Cloud static analysis, backend JaCoCo coverage and a blocking quality gate are planned additions to PR quality assurance. |
+| Quality control | Backend unit, integration and HTTP system tests; frontend unit tests, TypeScript checks and production builds; GitHub Actions and required checks before merging. SonarQube Cloud static analysis, backend JaCoCo coverage and a blocking quality gate are planned additions to PR quality assurance. |
 | Deployment | Local frontend and backend processes, with PostgreSQL 17 in a Docker container. Application container images and a production deployment have not been configured. |
 | Development process | Iterative and incremental work organized through GitHub issues, branches and pull requests, with automated integration checks. |
 
@@ -191,7 +191,7 @@ The implemented technical features are traceable to GitHub issues. The functiona
 | Category queries and API, [P2-07 / #10](https://github.com/codeurjc-students/2026-Artseek/issues/10) and [CQRS / #19](https://github.com/codeurjc-students/2026-Artseek/issues/19) | Query-handler unit/integration tests and category controller unit/integration tests. | Query registration, input validation, DTO mapping, immutable output where asserted, database-backed filtering, routing, JSON and invalid-type errors. |
 | Mediator, [#19](https://github.com/codeurjc-students/2026-Artseek/issues/19) | `SpringMediatorUnitTests`. | Query and command dispatch, empty registries, duplicate registrations and missing handlers. |
 | Application startup | `ArtseekApplicationIntegrationTests`. | Spring application-context startup with test configuration. |
-| Frontend, [P2-08 / #11](https://github.com/codeurjc-students/2026-Artseek/issues/11) | TypeScript checks and React Router/Vite production builds. | Route type generation, TypeScript compatibility and successful compilation. Automated frontend behavior tests have not been added yet. |
+| Frontend, [P2-08 / #11](https://github.com/codeurjc-students/2026-Artseek/issues/11) | Vitest, React Testing Library and jsdom; TypeScript checks and React Router/Vite production builds. | Mocked API success, empty responses, failures and cancellation; query caching/retries; loader data and rendered categories/health; shared loading and errors; TypeScript compatibility and production compilation. |
 
 Backend tests use [JUnit](https://junit.org/), [Mockito](https://site.mockito.org/), [AssertJ](https://assertj.github.io/doc/) and [Spring Boot test support](https://docs.spring.io/spring-boot/reference/testing/index.html). Unit tests isolate domain/application classes or the MVC boundary. Integration tests exercise real Spring components and persistence; the system test starts an actual HTTP server on a random port.
 
@@ -247,8 +247,8 @@ As of the inspected checkout on 24 October 2026, `HEAD` (`93cbfda`) contains **4
 
 | Workflow | Trigger | Backend job | Frontend job |
 | --- | --- | --- | --- |
-| [Development quality check](../.github/workflows/development-ci.yml) | Push to any branch other than `main`. | Configures Java from `.java-version`, caches Maven dependencies, compiles the backend and runs `*UnitTests`. | Configures pnpm and Node.js, installs with the frozen lockfile, runs `pnpm typecheck` and `pnpm build`. |
-| [Pull request quality assurance](../.github/workflows/pull-request-qa.yml) | Pull requests targeting `main` when opened, updated, reopened or marked ready; also pushes to `main`. | Runs unit, integration and system test classes separately, failing if an expected test group is missing. | Installs with the frozen lockfile, builds, type-checks and builds again, matching the current workflow definition. |
+| [Development quality check](../.github/workflows/development-ci.yml) | Push to any branch other than `main`. | Configures Java from `.java-version`, caches Maven dependencies, compiles the backend and runs `*UnitTests`. | Configures pnpm and Node.js, installs with the frozen lockfile, then runs `pnpm typecheck`, `pnpm test` and `pnpm build`. |
+| [Pull request quality assurance](../.github/workflows/pull-request-qa.yml) | Pull requests targeting `main` when opened, updated, reopened or marked ready; also pushes to `main`. | Runs unit, integration and system test classes separately, failing if an expected test group is missing. | Installs with the frozen lockfile, then runs `pnpm typecheck`, `pnpm test` and `pnpm build`. A failed unit test fails the required **Frontend test suite** check. |
 
 **Planned PR QA extension:** The backend job will run the full suite through `mvn verify` and produce JaCoCo coverage. A SonarQube Cloud job will analyze backend and frontend sources after the build/test jobs, import backend coverage, and wait for the quality gate. The workflow will retain its pull-request and `main` push triggers to support PR analysis and the target-branch baseline. The **SonarQube Cloud** job will become a required merge check. This extension has not been implemented yet; the table above describes the current workflow.
 
@@ -398,7 +398,29 @@ To run a particular class, use `mvn test "-Dtest=CategoryUnitTests"`. Maven Sure
 
 Once the planned JaCoCo integration is implemented, `mvn verify` from `backend/` will also generate the coverage reports described under [planned static analysis and coverage](#planned-static-analysis-and-coverage). The current Maven configuration does not generate those reports yet.
 
-From `frontend/`, run `pnpm typecheck` and `pnpm build` after installing dependencies. The frontend currently has no automated test command or configured browser-test suite. Manually check category navigation, empty responses, root error handling, navigation loading feedback, and the health page's unavailable-backend state. With the loader-based design, use the browser's network tools to check that returning to a category page within its freshness window reuses cached data, stale or invalidated entries fetch on the next loader execution, different category types use separate entries, and every health-page visit checks backend availability. Do not expect an already-rendered loader snapshot to update merely because its cache entry changes.
+From `frontend/`, run the frontend checks after installing dependencies:
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm test
+pnpm typecheck
+pnpm build
+```
+
+`pnpm test` runs all Vitest unit tests once, without watch mode, and returns a
+nonzero exit code when an assertion fails. Requests use isolated fetch mocks;
+the backend and database can remain stopped. Tests live under `frontend/test/`,
+mirroring the directories in `frontend/app/`. They cover API validation, query
+caching, client loaders, rendered pages, shared loading/error UI, and backend
+availability. See the [frontend testing guide](../frontend/README.md#unit-tests)
+for fixtures, mocking, focused runs, watch mode, and adding tests.
+
+Both CI workflows run these checks. The active `main` ruleset requires the
+**Frontend test suite** check, so a failing frontend test prevents merging.
+To verify failure handling, temporarily change an assertion, run `pnpm test`
+and confirm a nonzero exit code; push it on a feature branch with a PR targeting
+`main` to confirm the failed check blocks merging, then restore the assertion
+and push the correction.
 
 ## Creating a release
 
