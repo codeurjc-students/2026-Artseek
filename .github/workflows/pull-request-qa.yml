@@ -63,11 +63,11 @@ jobs:
       - name: Install client dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build client
-        run: pnpm build
-
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Build
+      - name: Run client unit tests
+        run: pnpm test
+
+      - name: Build client
         run: pnpm build
