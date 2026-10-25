@@ -189,7 +189,7 @@ Backend tests use [JUnit](https://junit.org/), [Mockito](https://site.mockito.or
 [P2-10 / #18](https://github.com/codeurjc-students/2026-Artseek/issues/18) will extend the blocking PR quality-assurance workflow with SonarQube Cloud and backend JaCoCo coverage:
 
 - SonarQube Cloud will statically analyze the backend Java and frontend TypeScript/JavaScript sources. Native pull-request analysis will evaluate new and modified code relative to the target branch; analysis on pushes to `main` will maintain the baseline.
-- The complete backend test suite will run through Maven's `verify` lifecycle. JaCoCo will generate HTML and XML coverage reports, and SonarQube Cloud will import the backend XML report. Frontend coverage is outside the scope of this planned addition.
+- The complete backend test suite will run through Maven's `verify` lifecycle. JaCoCo will generate `backend/target/site/jacoco/index.html` and `backend/target/site/jacoco/jacoco.xml`, and SonarQube Cloud will import the XML report. Frontend coverage is outside the scope of this planned addition.
 - The analysis job will wait for the quality-gate result. A failed analysis, unavailable analysis service or failed quality gate will leave the workflow unsuccessful and prevent merging through the required check.
 - A **SonarQube Cloud** required check will be added to the `main` ruleset alongside **Backend test suite** and **Frontend test suite**. Submitting an analysis alone will not satisfy the planned gate.
 
@@ -382,6 +382,8 @@ mvn test "-Dtest=*SystemTests" "-Dsurefire.failIfNoSpecifiedTests=true"
 ```
 
 To run a particular class, use `mvn test "-Dtest=CategoryUnitTests"`. Maven Surefire writes XML reports and text summaries to `backend/target/surefire-reports/`; console output reports test counts, failures, errors and skipped tests.
+
+Once the planned JaCoCo integration is implemented, `mvn verify` from `backend/` will also generate the coverage reports described under [planned static analysis and coverage](#planned-static-analysis-and-coverage). The current Maven configuration does not generate those reports yet.
 
 From `frontend/`, run `pnpm typecheck` and `pnpm build` after installing dependencies. The frontend currently has no automated test command or configured browser-test suite. The routes can be checked manually using the category and health pages, including their unavailable-backend states.
 
