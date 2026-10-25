@@ -1,0 +1,59 @@
+{
+  "info": {
+    "name": "Artseek - REST API",
+    "description": "Examples for every application endpoint currently implemented in Artseek. Start PostgreSQL and the backend with the local profile to load sample painting and tattoo categories. All requests are read-only. Generated category IDs and the number of stored categories depend on the local database. OpenAPI and Swagger UI are available separately at /v3/api-docs.yaml and /swagger-ui.html.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health — 200 with an empty body",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health",
+        "description": "Checks whether the running backend responds to HTTP. Expected status: 200. The controller returns no response body; this is not a JSON status endpoint or a dependency-health report."
+      }
+    },
+    {
+      "name": "List category types present in the database",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/1.0/categories/types/used",
+        "description": "Expected status: 200. With the local sample data, the JSON response is [{\"value\":\"painting\"},{\"value\":\"tattoo\"}]. An empty database produces []. This operation returns types in use, not an independent list of every supported type."
+      }
+    },
+    {
+      "name": "List painting categories",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/1.0/categories/painting",
+        "description": "Expected status: 200. Each JSON array element has numeric id, string name, and type equal to painting. Local sample names are Surrealism, Impressionism, and Realism. IDs are generated and response order is not guaranteed. A supported type with no stored categories produces []."
+      }
+    },
+    {
+      "name": "List tattoo categories",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/1.0/categories/tattoo",
+        "description": "Expected status: 200. Each JSON array element has numeric id, string name, and type equal to tattoo. Local sample names are Blackwork and Watercolor. IDs are generated and response order is not guaranteed."
+      }
+    },
+    {
+      "name": "Reject an unsupported category type — 400",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/1.0/categories/sculpture",
+        "description": "Example invalid input for the categories-by-type operation. Sculpture is not a supported CategoryType. Expected status: 400 with an empty body."
+      }
+    }
+  ]
+}
