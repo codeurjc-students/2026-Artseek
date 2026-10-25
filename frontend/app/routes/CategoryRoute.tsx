@@ -1,10 +1,16 @@
-import Alert from 'react-bootstrap/Alert'
-import ListGroup from 'react-bootstrap/ListGroup'
-import Spinner from 'react-bootstrap/Spinner'
+import { Alert, ListGroup } from 'react-bootstrap'
 import { Link } from 'react-router'
 
-import { useCategoriesByTypeQuery } from '../features/categories/hooks/category-hooks'
+import { categoriesByTypeQueryOptions } from '../features/categories/queries/category-queries'
+import { queryClient } from '../lib/query-client'
 import type { Route } from './+types/CategoryRoute'
+
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const categories = await queryClient.query(
+    categoriesByTypeQueryOptions(params.categoryType),
+  )
+  return { categories }
+}
 
 export function meta({ params }: Route.MetaArgs) {
   return [
@@ -16,8 +22,8 @@ export function meta({ params }: Route.MetaArgs) {
   ]
 }
 
-export default function Category({ params }: Route.ComponentProps) {
-  const categories = useCategoriesByTypeQuery(params.categoryType)
+export default function Category({ params, loaderData }: Route.ComponentProps) {
+  const { categories } = loaderData
 
   return (
     <main>
@@ -29,25 +35,15 @@ export default function Category({ params }: Route.ComponentProps) {
       <section aria-labelledby="categories-heading">
         <h2 id="categories-heading">Categories</h2>
 
-        {categories.isPending && (
-          <Spinner animation="border" role="status" aria-label="Loading categories" />
-        )}
-
-        {categories.isError && (
-          <Alert variant="danger">
-            Categories are unavailable right now. Please try again later.
-          </Alert>
-        )}
-
-        {categories.isSuccess && categories.data.length === 0 && (
+        {categories.length === 0 && (
           <Alert variant="secondary">
             No categories are currently available for this type.
           </Alert>
         )}
 
-        {categories.isSuccess && categories.data.length > 0 && (
+        {categories.length > 0 && (
           <ListGroup>
-            {categories.data.map((category) => (
+            {categories.map((category) => (
               <ListGroup.Item key={category.id}>{category.name}</ListGroup.Item>
             ))}
           </ListGroup>

@@ -1,119 +1,141 @@
 # Frontend Architecture & Stack Strategy: Artseek
 
-This document outlines the architectural decisions for the Artseek frontend, transitioning from a legacy layer-based structure to a modern, Feature-Driven approach using TanStack Query.
+This document defines the Artseek frontend standard: feature-driven modules, React Router client loaders for essential route data, and an imperative TanStack Query cache. Route components render loaderData.
 
 ## 1. The Core Stack
 
 *   **Framework:** React + Vite
-*   **Routing:** React Router (SPA navigation)
+*   **Routing and Route Data:** React Router framework mode (SPA navigation and `clientLoader`)
 *   **Server State Management:** TanStack Query (React Query)
 *   **Client State Management:** Zustand, only when shared client state is needed
 *   **Component Library:** React-Bootstrap with Bootstrap 5
 *   **Styling:** Tailwind CSS
 
-## 2. Server State vs. Client State
+## 2. Route Loading, Server State, and Actions
 
-In previous architectures, global stores (like Redux or raw Zustand) were used to hold data fetched from the API. This is now considered an anti-pattern. We divide the state into two distinct categories:
+React Router coordinates route loading and rendering. TanStack Query provides a cache behind client loaders. Pages render the typed `loaderData` returned by their loader; they do not subscribe to the query cache.
 
-### TanStack Query (Server State)
-Used strictly for asynchronous operations and data that lives on the backend (e.g., `Artworks`, `Artist Profiles`, `Search Results`).
-*   **What we get:** Automatic caching, request deduplication, background re-fetching, and built-in `isLoading` / `isError` flags without writing a single `useState` or `useEffect`.
-*   **Impact on Artseek:** Searching via embeddings is resource-intensive. Query caches the results of a multimodal search so if a user navigates away and back, the results load instantly from the cache without hitting the pgvector database again.
+### Responsibilities and Usage
 
-#### QueryOptions Contract
+| Tool | When to use it | Responsibility |
+| --- | --- | --- |
+| `clientLoader` | Backend data needed by a route | Read route inputs, await the QueryClient, and return typed loader data |
+| `QueryClient` | Cache-aware requests and cache invalidation | Reuse fresh responses, deduplicate concurrent requests, and fetch stale or missing data |
+| Feature `queries/` modules | Resource-specific query configuration | Define plain query-option factories, keys, freshness, and retries |
+| Route components | Display a loaded page | Render `loaderData` from generated `Route.ComponentProps` |
+| `useActionState` | User submissions and local validation or confirmation results | Own the submission result and pending state; call feature API functions |
+| Local React state / Zustand | Browser-only UI state | Keep state local by default; add Zustand only when shared UI state needs it |
 
-Follow the [TanStack Query `QueryOptions` reference](https://tanstack.com/query/latest/docs/framework/react/reference/interfaces/QueryOptions) when defining feature queries:
+### Shared QueryClient and Query Options
 
-*   Every query needs a stable `queryKey`. TanStack hashes the key for caching and updates the query when the key changes, so include every input that changes the requested server data.
-*   The `queryFn` must resolve to defined data or throw an error. It must never resolve to `undefined`; return a meaningful result object or `null` when a successful endpoint has no response body.
-*   Pass the `AbortSignal` from `QueryFunctionContext` to the underlying request so TanStack Query can cancel work that is no longer needed.
-*   Configure `retry` deliberately for the endpoint. The client default is three retries and the server default is zero; use fewer retries for fast availability checks and avoid retrying errors that cannot recover automatically.
-*   `gcTime` controls how long inactive cached data remains in memory. Its browser default is five minutes. Change it only when the feature's data size or navigation behavior justifies a different lifetime.
-*   `initialData` is persisted in the cache and is stale by default unless paired with an appropriate `staleTime`. Do not use fabricated initial data merely to bypass pending UI.
-*   Keep query options such as retries, cache lifetime, network mode, and metadata in the feature's `hooks/` layer rather than scattering them through routes and components.
+*   Define and export one QueryClient for the browser application in `app/lib/query-client.ts`. All client loaders use that instance. Do not create a client per loader, component, or navigation. If runtime SSR is introduced later, scope server clients per request.
+*   Define options with TanStack's `queryOptions` helper in feature `queries/<resource>-queries.ts` modules. Export plain factories such as `categoriesByTypeQueryOptions(type)`; these are configuration functions, not React hooks.
+*   Keep keys, query functions, freshness, and retry policies in those factories. Loaders call `await queryClient.query(options)` using the installed TanStack API, then return the result as loader data.
+*   Keep HTTP calls, response validation, and DTO mapping in feature `api/` modules.
+*   Do not introduce `useQuery`, `useSuspenseQuery`, or wrapper query hooks for these pages. A `QueryClientProvider` is unnecessary for imperative QueryClient calls, so do not add a provider just for loaders.
+*   Add a `hooks/` folder only for actual custom React hooks required by a feature. Plain query options belong in `queries/`.
 
-### Zustand (Client State)
-Used strictly for synchronous, shared UI state that only exists in the user's browser. Do not create a store for local component state or until a feature genuinely needs one.
-*   **Examples:** The current JWT token, the open/closed state of the "Upload Artwork" modal, or the user's selected layout preference (Grid vs. Masonry).
+### Client Loaders and Route Components
+
+*   Export `clientLoader` from routes needing backend data. Use generated `Route.ClientLoaderArgs` when consuming loader arguments, and `Route.ComponentProps` for component props. This project uses SPA mode (`ssr: false`), so these requests run in the browser.
+*   Read path variables from `params`: `category/:categoryType` supplies `params.categoryType`. Read query strings from `new URL(request.url).searchParams`. Include relevant inputs in cache keys.
+*   Return meaningful named data such as `{ categories }`; render it using `const { categories } = loaderData`. Do not populate the cache and then independently fetch or subscribe to the same data in the component.
+*   Use `HydrateFallback` for initial loading and `useNavigation` for pending navigation. Use only the shared `ErrorBoundary` in `app/root.tsx`; do not add route-specific boundaries unless explicitly requested. Loader failures propagate to the root boundary. Preserve explicit diagnostic outcomes such as the health page returning `null` for an unavailable backend.
+*   `loaderData` is a snapshot from the latest loader execution. Cache changes alone do not update a mounted page. There is no automatic background refresh, focus refetching, or polling with this design; navigation or explicit router revalidation must run the loader again.
+*   Pass the query function's `AbortSignal` to `fetch`. Router navigation cancellation and cached request cancellation are separate lifecycles; do not indiscriminately cancel requests shared by concurrent loaders.
+
+For example, returning to a category page runs its client loader again. If its cached response is still fresh, the loader returns it without another HTTP request. If missing, stale, or invalidated, the loader awaits a request and returns the new data. Category queries currently use a one-minute `staleTime`; health uses zero to check every visit.
+
+See [React Router client data loading](https://reactrouter.com/start/framework/data-loading), [TanStack router integration](https://tanstack.com/query/latest/docs/framework/react/guides/prefetching), and [query options](https://tanstack.com/query/latest/docs/framework/react/guides/query-options).
+
+### QueryOptions Contract
+
+*   Use stable keys containing every input that changes the requested server data.
+*   Query functions must return defined data or throw. For successful empty responses, return a meaningful result or `null`, never `undefined` or `void`.
+*   Set `retry` deliberately: imperative `queryClient.query` disables retries unless configured. Avoid retrying failures that cannot recover automatically.
+*   Set `staleTime` for each resource. Cached data does not guarantee request-free navigation after it becomes stale or invalidated.
+*   `gcTime` controls cache retention, independently of freshness. Its browser default is five minutes. Without query observers, cache entries can become inactive even while their page is displayed; eviction does not remove already-returned loader data.
+*   Do not fabricate `initialData` to bypass route loading. Keep query configuration in feature `queries/` modules rather than duplicating it in routes.
+
+Reference: [TanStack Query `QueryOptions`](https://tanstack.com/query/latest/docs/framework/react/reference/interfaces/QueryOptions).
+
+### Submissions and `useActionState`
+
+Use `useActionState` for submission pending state, returned validation errors, and confirmation messages. Actions call feature API functions. Repeated actions are queued sequentially; this hook does not provide a response cache.
+
+If a successful write changes cached resources, invalidate or update the affected entries through the shared QueryClient. Keep resource-specific invalidation logic in the feature's `queries/` module. To refresh a currently displayed page, explicitly revalidate its loader or navigate to the relevant route after invalidation. Router revalidation alone may return fresh cached data; cache invalidation alone does not update `loaderData`.
+
+Choose one owner for a submission's pending/error state; do not add a TanStack mutation hook alongside `useActionState` for the same request. Query subscription and mutation hooks are not required by this architecture.
+
+See the [React `useActionState` reference](https://react.dev/reference/react/useActionState) and [TanStack cache invalidation](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation).
+
+### Browser-Only UI State
+
+Keep local UI state in React. Introduce Zustand only when multiple components need shared browser-only state, such as layout preferences. Do not mirror API responses or loader data in a UI store.
 
 ## 3. Feature-Driven Architecture
 
-Instead of organizing files by type (`/routes`, `/services`, `/stores`), we group them by domain features. This makes the codebase scalable and prevents context-switching.
+Group files by product domain. Category types belong to the categories feature because their behavior and contracts are closely related.
 
 ```text
-app/                        # React Router framework-mode source root
-├── root.tsx                # Global providers and document shell
-├── app.css                 # Generic styles and Tailwind entry point
-├── components/             # Shared UI components (Buttons, Inputs, Spinners)
-├── lib/                    # Shared third-party setup, added only when needed
-├── features/               # FEATURE MODULES
-│   ├── auth/               
+app/
+├── root.tsx                # Document shell, hydration fallback, navigation UI
+├── app.css                 # Global styles and Tailwind entry point
+├── components/             # Shared UI components, added when needed
+├── lib/
+│   └── query-client.ts     # Shared imperative QueryClient
+├── features/
+│   ├── backend-status/
 │   │   ├── api/
-│   │   │   └── auth-api.ts # Cohesive API auth operations (login, register)
-│   │   ├── hooks/  # TanStack Query hooks for the feature
-│   │   │   └── auth-hooks.ts
-│   │   ├── components/     # LoginForm, RegisterForm
-│   │   └── store.ts        # Zustand store (JWT, currentUser)
-│   │
-│   ├── search/             
-│   │   ├── api/
-│   │   │   └── artwork-search-api.ts
-│   │   ├── hooks/
-│   │   │   └── artwork-search-hooks.ts
-│   │   ├── model/
-│   │   │   └── SearchResultDTO.ts
-│   │   └── components/     # SearchBar, ResultGrid
-│   │
-│   └── portfolio/          
+│   │   └── queries/
+│   │       └── backend-status-queries.ts
+│   └── categories/
 │       ├── api/
-│       │   └── portfolio-api.ts
-│       ├── hooks/
-│       │   └── portfolio-hooks.ts # usePortfolioQuery(), useCreateArtworkMutation()
-│       └── components/     
-│
-└── routes/                 # Lazy-loaded page components that import from features/
+│       │   ├── category-api.ts
+│       │   └── category-type-api.ts
+│       ├── queries/
+│       │   ├── category-queries.ts
+│       │   └── category-type-queries.ts
+│       └── model/
+│           ├── CategoryDTO.ts
+│           └── CategoryTypeDTO.ts
+└── routes/                 # Client loaders, components rendering loaderData, errors
     ├── HomeRoute.tsx
-    ├── SearchRoute.tsx
-    └── ArtistProfileRoute.tsx
+    ├── CategoryRoute.tsx
+    └── HealthRoute.tsx
 ```
 
-## 4. API and Query Hook Design
+## 4. API, Query, and Model Design
 
-Keep API operations and their TanStack Query hooks inside the feature that owns them. Every feature that communicates with the backend has an `api/` folder, and every feature exposing TanStack Query hooks has a `hooks/` folder. Group files by cohesive resource or workflow: neither one catch-all file per feature nor one file per operation is the default.
+Keep API operations and cache configuration inside their owning feature. Group behavioral files by cohesive resource or workflow, rather than one catch-all file per feature or one file per operation.
 
 ### Responsibilities
 
-*   **`api/`:** Contains transport-level functions, request and response types that are private to the transport, response validation, and HTTP error handling. Its files must not depend on React or TanStack Query. A function used as a query function must resolve to defined data on success; return a meaningful result object or `null` for an empty response, never `undefined` or `void`.
-*   **`hooks/`:** Contains query keys, query options, and exported TanStack Query hooks. Its files call functions from `api/` and own cache behavior such as retries, stale times, and invalidation.
-*   **`model/`:** Contains the feature's API data contracts. Every object received from or sent to the API must have a named model here instead of an inline object type in API, hook, route, or component code.
-*   **Components and routes:** Consume hooks. They must not call `fetch` directly or duplicate query keys.
+*   **`api/`:** HTTP functions, validation, error handling, and transport mapping. No React, React Router, or TanStack dependencies.
+*   **`queries/`:** Plain query-option factories, cache keys, policies, and resource-specific invalidation helpers. No component subscriptions or routing dependencies.
+*   **`model/`:** Named API data contracts. Every object received from or sent to the API must have a model here instead of an inline object type in API, loader, or component code.
+*   **Route loaders:** Call the shared QueryClient with feature query options and return data.
+*   **Route components:** Render typed `loaderData`. Submission actions may call feature APIs and cache helpers. Do not call `fetch` directly or duplicate query keys.
 
-Do not create global `api/` or `hooks/` directories containing unrelated domains. Cross-cutting HTTP configuration may live in `app/lib` once it is genuinely shared.
+Do not create global `api/` or `queries/` folders containing unrelated domains. Shared HTTP configuration may live in `app/lib` when needed.
 
 ### Naming Rules
 
-*   Name feature directories in kebab-case: `backend-status`, `artist-profile`.
-*   Name API and hook files after their cohesive resource or workflow using `<resource>-api.ts` and `<resource>-hooks.ts`: `api/category-type-api.ts` and `hooks/category-type-hooks.ts`.
-*   Name API model files and exported types after the backend contract in PascalCase, preserving the `DTO` suffix when present: `model/CategoryTypeDTO.ts` exports `CategoryTypeDTO`.
-*   Name API functions with an operation verb and domain object: `fetchBackendStatus`, `searchArtworks`, `createArtwork`, `updateArtistProfile`, `deleteArtwork`.
-*   Name read hooks `use<Domain>Query`: `useBackendStatusQuery`, `usePortfolioQuery`.
-*   Name write hooks `use<Operation><Domain>Mutation`: `useCreateArtworkMutation`, `useDeleteArtworkMutation`.
-*   Name query-key factories `<domain>Keys`, for example `portfolioKeys`, when a feature has multiple related queries. A single inline key is acceptable for a feature with only one query.
-*   Name React component files and exports in PascalCase. Keep non-component TypeScript filenames lowercase and kebab-case, except for the conventional `store.ts` file and PascalCase DTO model files.
+*   Feature directories use kebab-case: `backend-status`, `categories`.
+*   API files use `<resource>-api.ts`; query files use `<resource>-queries.ts`, for example `category-type-api.ts` and `category-type-queries.ts`.
+*   Option factories use `<operationOrResource>QueryOptions`: `usedCategoryTypesQueryOptions`, `categoriesByTypeQueryOptions`.
+*   API functions use an operation verb and domain object: `fetchUsedCategoryTypes`, `fetchCategoriesByType`, `createArtwork`.
+*   When multiple queries need a key factory, name it `<domain>Keys`. A single key inside an option factory is sufficient for one query.
+*   API model files and exports match backend contracts in PascalCase, preserving `DTO`: `model/CategoryTypeDTO.ts` exports `CategoryTypeDTO`.
+*   React component files and exports use PascalCase. Other TypeScript filenames use lowercase kebab-case, except DTO model files and conventional `store.ts`.
 
-### When to Split Files
+### Cohesion and Models
 
-Start with one API file and one hooks file for each cohesive resource or workflow. Related operations such as `fetchUsedCategoryTypes` and `fetchSupportedCategoryTypes` belong together in `category-type-api.ts`; their query keys and hooks belong together in `category-type-hooks.ts`. This keeps cache identity, invalidation, and related behavior discoverable in one place.
+Related operations such as fetching used and supported category types belong together in `category-type-api.ts`; their options and keys belong together in `category-type-queries.ts`. Split by resource or workflow when complexity or independent ownership warrants it. A complex operation may have its own file, but neither file length nor one-function-per-file consistency is a reason to split.
 
-Split a resource file when it develops distinct subdomains, substantially different workflows, or independent ownership. A single operation may get its own file when it has meaningful standalone complexity, supporting types, or specialized cache behavior. Do not create one file per function or hook merely for consistency, and do not use file length alone as the reason to split.
+DTO models remain one named file per contract. Prefer simple TypeScript interfaces or types composed of primitives, arrays, and other named models. Do not introduce classes, methods, or client state in DTOs. Keep validation and mapping in `api/`.
 
-This grouping rule applies to behavior. DTO models remain one named file per API contract because they are stable, independently imported data definitions.
-
-API models should be simple TypeScript `interface` or `type` declarations composed of primitives, arrays, and other named models. Do not use classes, methods, client state, or behavior in DTO models. Keep transport validation and mapping in `api/`.
-
-Choose feature boundaries by cohesive product domain, not one feature per backend DTO. Closely related contracts with limited independent behavior belong together; for example, `CategoryTypeDTO` belongs in `features/categories/model/` because category types are part of the categories domain and do not justify a separate feature.
-
-Add a `store.ts` only for shared client state; server responses remain in TanStack Query.
+Add a `store.ts` only for shared client state; fetched resources remain in the query cache and route loader data.
 
 ## 5. React-Bootstrap and Navigation
 
@@ -122,7 +144,7 @@ Use React-Bootstrap components for standard interface elements such as lists, bu
 React-Bootstrap does not replace React Router. Use React Router's `Link` for internal SPA navigation so navigation does not reload the document. When a Bootstrap component should navigate, compose it with `Link` through its `as` prop:
 
 ```tsx
-import ListGroup from 'react-bootstrap/ListGroup'
+import { ListGroup } from 'react-bootstrap'
 import { Link } from 'react-router'
 
 <ListGroup.Item as={Link} to="/category/painting" action>
@@ -130,4 +152,4 @@ import { Link } from 'react-router'
 </ListGroup.Item>
 ```
 
-Use ordinary anchors only for external destinations, downloads, or protocols handled outside the SPA. Keep routing concerns in routes and navigation components; feature API and hook modules must not depend on React Router or React-Bootstrap.
+Use ordinary anchors only for external destinations, downloads, or protocols handled outside the SPA. Keep routing concerns in routes and navigation components; feature API and query modules must not depend on React Router or React-Bootstrap.

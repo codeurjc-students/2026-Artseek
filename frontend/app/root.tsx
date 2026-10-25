@@ -5,11 +5,12 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigation,
 } from 'react-router'
 import type { ReactNode } from 'react'
+import { Spinner } from 'react-bootstrap'
 
 import type { Route } from './+types/root'
-import { AppProviders } from './providers'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './app.css'
 
@@ -32,10 +33,18 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const navigation = useNavigation()
+
   return (
-    <AppProviders>
+    <>
+      {navigation.state !== 'idle' && (
+        <div role="status">
+          <Spinner animation="border" size="sm" aria-hidden="true" />
+          <span>Loading page…</span>
+        </div>
+      )}
       <Outlet />
-    </AppProviders>
+    </>
   )
 }
 
