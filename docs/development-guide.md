@@ -25,7 +25,7 @@ The planned architecture also includes a separate context for AI artwork analysi
 | Type | Web SPA and REST API, with one backend application and one relational database. |
 | Technologies | React, TypeScript, React Router, TanStack Query, React-Bootstrap, Bootstrap and Tailwind CSS; Java, Spring Boot, Spring Data JPA and PostgreSQL. |
 | Tools | Visual Studio Code with Spring Boot extensions, IntelliJ IDEA, Git, GitHub, Maven, Node.js, pnpm, Vite, Docker, Postman and OpenAPI tooling. |
-| Quality control | Backend unit, integration and HTTP system tests; frontend unit tests, TypeScript checks and production builds; GitHub Actions and required checks before merging. SonarQube Cloud static analysis, backend JaCoCo coverage and a blocking quality gate are planned additions to PR quality assurance. |
+| Quality control | Backend unit, integration and HTTP system tests; frontend unit tests, TypeScript checks and production builds; GitHub Actions and required checks before merging. Backend SonarQube Cloud static analysis and JaCoCo coverage feed a quality gate in PR quality assurance; see the setup guide for service configuration and required checks. |
 | Deployment | Local frontend and backend processes, with PostgreSQL 17 in a Docker container. Application container images and a production deployment have not been configured. |
 | Development process | Iterative and incremental work organized through GitHub issues, branches and pull requests, with automated integration checks. |
 
@@ -60,8 +60,8 @@ The backend dependencies are declared in [`backend/pom.xml`](../backend/pom.xml)
 | [Postman](https://learning.postman.com/docs/getting-started/overview/) | Sends requests to the REST API. The [project collection](api/artseek.postman_collection.json) contains examples for every currently implemented application endpoint. |
 | [springdoc-openapi](https://springdoc.org/) and [OpenAPI Generator](https://openapi-generator.tech/) | Expose the OpenAPI contract and Swagger UI, export the YAML contract, and generate the HTML API reference. |
 | [GitHub Actions](https://docs.github.com/en/actions) | Runs backend tests and frontend checks on branch pushes, pull requests and integration into `main`. |
-| [SonarQube Cloud](https://docs.sonarsource.com/sonarqube-cloud/) (formerly SonarCloud; planned) | Will analyze backend Java and frontend TypeScript/JavaScript in the PR quality-assurance workflow, report findings on pull requests and enforce a blocking quality gate. |
-| [JaCoCo](https://www.jacoco.org/jacoco/) (planned) | Will measure backend test coverage and generate HTML and XML reports, with the XML report imported into SonarQube Cloud. |
+| [SonarQube Cloud](https://docs.sonarsource.com/sonarqube-cloud/) (formerly SonarCloud) | Analyzes backend Java in the PR quality-assurance workflow, reports findings on pull requests and evaluates a blocking quality gate. |
+| [JaCoCo](https://www.jacoco.org/jacoco/) | Measures backend test coverage and generates HTML and XML reports, with the XML report imported into SonarQube Cloud. |
 
 ## Architecture
 
@@ -197,16 +197,16 @@ Backend tests use [JUnit](https://junit.org/), [Mockito](https://site.mockito.or
 
 [`backend/src/test/resources/application.properties`](../backend/src/test/resources/application.properties) selects an in-memory [H2](https://www.h2database.com/) database in PostgreSQL compatibility mode with schema creation and removal. Tests do not require the development PostgreSQL container. JPA slice tests roll back automatically, and the full-context tests that write data use transactions. The `local` profile is not activated during ordinary test runs. H2 compatibility mode does not verify every PostgreSQL-specific behavior.
 
-### Planned static analysis and coverage
+### Static analysis and coverage
 
-[P2-10 / #18](https://github.com/codeurjc-students/2026-Artseek/issues/18) will extend the blocking PR quality-assurance workflow with SonarQube Cloud and backend JaCoCo coverage:
+[P2-10 / #18](https://github.com/codeurjc-students/2026-Artseek/issues/18) extends the blocking PR quality-assurance workflow with SonarQube Cloud and backend JaCoCo coverage. The agreed analysis scope is backend only:
 
-- SonarQube Cloud will statically analyze the backend Java and frontend TypeScript/JavaScript sources. Native pull-request analysis will evaluate new and modified code relative to the target branch; analysis on pushes to `main` will maintain the baseline.
-- The complete backend test suite will run through Maven's `verify` lifecycle. JaCoCo will generate `backend/target/site/jacoco/index.html` and `backend/target/site/jacoco/jacoco.xml`, and SonarQube Cloud will import the XML report. Frontend coverage is outside the scope of this planned addition.
-- The analysis job will wait for the quality-gate result. A failed analysis, unavailable analysis service or failed quality gate will leave the workflow unsuccessful and prevent merging through the required check.
-- A **SonarQube Cloud** required check will be added to the `main` ruleset alongside **Backend test suite** and **Frontend test suite**. Submitting an analysis alone will not satisfy the planned gate.
+- SonarQube Cloud analyzes backend Java sources and tests. Native pull-request analysis evaluates new and modified code relative to the target branch; analysis on pushes to `main` maintains the baseline.
+- The complete backend test suite runs through Maven's `verify` lifecycle. JaCoCo generates `backend/target/site/jacoco/index.html` and `backend/target/site/jacoco/jacoco.xml`, and SonarQube Cloud imports the XML report. Frontend analysis and coverage are outside this integration's scope; frontend tests, type checking and building remain in CI.
+- The analysis job waits for the quality-gate result with a 300-second timeout. A failed analysis, unavailable analysis service or failed quality gate leaves the workflow unsuccessful.
+- Require **SonarQube Cloud** in the `main` ruleset alongside **Backend test suite** and **Frontend test suite** to block merging when the gate fails. Submitting an analysis alone does not satisfy the gate.
 
-The integration is planned and is not present in the current workflow or Maven configuration. The SonarQube Cloud project binding, analysis credentials and quality-gate conditions will be configured during implementation. No coverage percentage, threshold or successful analysis result is claimed here.
+The root [`sonar-project.properties`](../sonar-project.properties) identifies `codeurjc-students_2026-Artseek`. The [SonarQube Cloud setup guide](sonarcloud-setup.md) covers project binding, disabling Automatic Analysis, the `SONAR_TOKEN` Actions secret, server-side quality-gate conditions, initial baseline analysis and required checks. Local Maven verification does not verify those external settings or claim a successful cloud quality gate. No repository-wide JaCoCo threshold is configured.
 
 ### Results and code size
 
@@ -219,7 +219,7 @@ The successful [quality-assurance run on `main`, 19 October 2026](https://github
 | System | 1 | 0 | 0 | 0 |
 | **Total** | **49** | **0** | **0** | **0** |
 
-The same run successfully type-checked and built the frontend. These results predate the planned SonarQube Cloud and JaCoCo integration described above. There is currently no configured coverage reporter, coverage threshold, dedicated linter or SonarQube Cloud analysis, so no coverage percentage or static-analysis quality-gate result is reported.
+The same run successfully type-checked and built the frontend. These historical results predate the SonarQube Cloud and JaCoCo integration described above and do not establish its coverage percentage or cloud quality-gate result. There is no dedicated linter or repository-wide coverage threshold.
 
 The following source-size snapshot was measured on 24 October 2026 at commit `93cbfda`, counting tracked files under `backend/src/main/java/` and `frontend/app/`. Physical lines include comments and blank lines; tests, configuration, generated files and dependencies are excluded.
 
@@ -239,7 +239,7 @@ Changes are developed in branches and integrated into `main` through pull reques
 
 The active ruleset for the default branch requires a pull request, disallows branch deletion and force pushes, and requires the **Backend test suite** and **Frontend test suite** checks. Required checks must pass with the branch up to date before merging. The configured approving-review count is zero. [`CHANGELOG.md`](../CHANGELOG.md) remains the designated change log at the repository root.
 
-The planned SonarQube Cloud integration will add a third required check for static analysis and the quality gate. That check is not yet part of the current ruleset.
+The SonarQube Cloud integration adds a third workflow check for static analysis and the quality gate. It must also be required in the ruleset; follow the [setup guide](sonarcloud-setup.md#4-run-the-analysis-and-require-the-check) to activate this merge requirement.
 
 As of the inspected checkout on 24 October 2026, `HEAD` (`93cbfda`) contains **41 commits**, local `main` (`6986a07`) contains **40 commits**, and **11 local branches** are present, including `main`. These are local snapshot counts; they do not count branches that have already been deleted.
 
@@ -248,9 +248,9 @@ As of the inspected checkout on 24 October 2026, `HEAD` (`93cbfda`) contains **4
 | Workflow | Trigger | Backend job | Frontend job |
 | --- | --- | --- | --- |
 | [Development quality check](../.github/workflows/development-ci.yml) | Push to any branch other than `main`. | Configures Java from `.java-version`, caches Maven dependencies, compiles the backend and runs `*UnitTests`. | Configures pnpm and Node.js, installs with the frozen lockfile, then runs `pnpm typecheck`, `pnpm test` and `pnpm build`. |
-| [Pull request quality assurance](../.github/workflows/pull-request-qa.yml) | Pull requests targeting `main` when opened, updated, reopened or marked ready; also pushes to `main`. | Runs unit, integration and system test classes separately, failing if an expected test group is missing. | Installs with the frozen lockfile, then runs `pnpm typecheck`, `pnpm test` and `pnpm build`. A failed unit test fails the required **Frontend test suite** check. |
+| [Pull request quality assurance](../.github/workflows/pull-request-qa.yml) | Pull requests targeting `main` when opened, updated, reopened or marked ready; also pushes to `main`. | Runs the complete unit, integration and system suite through `mvn verify`, generates JaCoCo HTML/XML, and uploads classes, test classes and coverage XML for one day. | Installs with the frozen lockfile, then runs `pnpm typecheck`, `pnpm test` and one `pnpm build`. A failed unit test fails the required **Frontend test suite** check. |
 
-**Planned PR QA extension:** The backend job will run the full suite through `mvn verify` and produce JaCoCo coverage. A SonarQube Cloud job will analyze backend and frontend sources after the build/test jobs, import backend coverage, and wait for the quality gate. The workflow will retain its pull-request and `main` push triggers to support PR analysis and the target-branch baseline. The **SonarQube Cloud** job will become a required merge check. This extension has not been implemented yet; the table above describes the current workflow.
+The **SonarQube Cloud** job depends on both build/test jobs, checks out the complete Git history, downloads the backend artifact, and analyzes backend sources and coverage. It waits up to 300 seconds for the quality gate. PR and `main` push triggers support native PR analysis and the target-branch baseline. Configure this check as required in the `main` ruleset as described in the setup guide.
 
 Both workflows use Ubuntu runners and read-only repository permissions. Their current scope is validation; they do not publish application images, deploy the application or create releases. Logs are available in [GitHub Actions](https://github.com/codeurjc-students/2026-Artseek/actions).
 
@@ -386,7 +386,7 @@ cd backend
 mvn test
 ```
 
-The test configuration uses H2, so the development PostgreSQL container can remain stopped. Maven's test discovery includes the unit, integration and system suffixes. To reproduce the separate CI groups, run in `backend/`:
+The test configuration uses H2, so the development PostgreSQL container can remain stopped. Maven's test discovery includes the unit, integration and system suffixes. To run a particular test group, use these commands in `backend/`:
 
 ```powershell
 mvn test "-Dtest=*UnitTests" "-Dsurefire.failIfNoSpecifiedTests=true"
@@ -396,7 +396,7 @@ mvn test "-Dtest=*SystemTests" "-Dsurefire.failIfNoSpecifiedTests=true"
 
 To run a particular class, use `mvn test "-Dtest=CategoryUnitTests"`. Maven Surefire writes XML reports and text summaries to `backend/target/surefire-reports/`; console output reports test counts, failures, errors and skipped tests.
 
-Once the planned JaCoCo integration is implemented, `mvn verify` from `backend/` will also generate the coverage reports described under [planned static analysis and coverage](#planned-static-analysis-and-coverage). The current Maven configuration does not generate those reports yet.
+Run `mvn --batch-mode --no-transfer-progress verify` from `backend/` to execute the complete suite and generate the JaCoCo reports described under [static analysis and coverage](#static-analysis-and-coverage). Open `backend/target/site/jacoco/index.html` to inspect coverage; the XML report is imported by SonarQube Cloud in CI.
 
 From `frontend/`, run the frontend checks after installing dependencies:
 
