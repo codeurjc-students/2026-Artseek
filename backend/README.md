@@ -26,6 +26,23 @@ The API is available at `http://localhost:8080`. Verify it with `GET /api/health
 Database settings can be changed with `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and
 `JPA_DDL_AUTO`. Change the permitted browser origin with `FRONTEND_ORIGIN`.
 
+## Tests and coverage
+
+Run the complete unit, integration, and HTTP system test suite with:
+
+```powershell
+mvn --batch-mode --no-transfer-progress verify
+```
+
+Tests use H2 and do not require PostgreSQL. JaCoCo attaches its agent before
+tests and generates `target/site/jacoco/index.html` for local inspection and
+`target/site/jacoco/jacoco.xml` for SonarQube Cloud during `verify`.
+Running `mvn test` executes tests without generating these reports.
+
+The PR workflow uploads compiled application classes, test classes, and the XML
+report for the Sonar analysis job. See the [SonarQube Cloud setup guide](../docs/sonarcloud-setup.md)
+for the project binding, Actions secret, quality gate, and required merge checks.
+
 ## OpenAPI documentation
 
 While the backend is running, the generated OpenAPI definition is available at

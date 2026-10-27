@@ -31,14 +31,19 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
-      - name: Run server unit tests
-        run: mvn --batch-mode --no-transfer-progress -Dtest='*UnitTests' -Dsurefire.failIfNoSpecifiedTests=true test
-      
-      - name: Run server integration tests
-        run: mvn --batch-mode --no-transfer-progress -Dtest='*IntegrationTests' -Dsurefire.failIfNoSpecifiedTests=true test
+      - name: Verify server and generate coverage
+        run: mvn --batch-mode --no-transfer-progress verify
 
-      - name: Run server system tests
-        run: mvn --batch-mode --no-transfer-progress -Dtest='*SystemTests' -Dsurefire.failIfNoSpecifiedTests=true test
+      - name: Upload backend analysis files
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-sonar-analysis
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            backend/target/classes/
+            backend/target/test-classes/
+            backend/target/site/jacoco/jacoco.xml
 
   client:
     name: Frontend test suite
@@ -71,3 +76,38 @@ jobs:
 
       - name: Build client
         run: pnpm build
+
+  sonar:
+    name: SonarQube Cloud
+    needs: [server, client]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository with complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java for analysis
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version-file: .java-version
+
+      - name: Download backend analysis files
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-sonar-analysis
+          path: backend/target
+
+      - name: Verify backend analysis files
+        run: |
+          test -d backend/target/classes
+          test -d backend/target/test-classes
+          test -s backend/target/site/jacoco/jacoco.xml
+
+      - name: Analyze code and wait for the quality gate
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: -Dsonar.java.jdkHome=${{ env.JAVA_HOME }}
