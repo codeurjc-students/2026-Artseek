@@ -173,8 +173,8 @@ The [generated HTML API reference](https://raw.githack.com/codeurjc-students/202
 | Operation | Behavior |
 | --- | --- |
 | `GET /api/health` | Returns HTTP `200` with an empty body when the backend responds. |
-| `GET /api/1.0/categories/types/used` | Returns distinct stored category types ordered by type, for example `[{"value":"painting"},{"value":"tattoo"}]`. An empty database returns `[]`. |
-| `GET /api/1.0/categories/{type}` | Returns categories with `id`, `name` and `type`. Supported types are `painting` and `tattoo`; parsing ignores case and surrounding whitespace. A supported type with no categories returns `[]`. An unsupported type returns HTTP `400` with an empty body. Category order is not specified. |
+| `GET /api/v1/categories/types/used` | Returns distinct stored category types ordered by type, for example `[{"value":"painting"},{"value":"tattoo"}]`. An empty database returns `[]`. |
+| `GET /api/v1/categories/{type}` | Returns categories with `id`, `name` and `type`. Supported types are `painting` and `tattoo`; parsing ignores case and surrounding whitespace. A supported type with no categories returns `[]`. An unsupported type returns HTTP `400` with an empty body. Category order is not specified. |
 
 The generated YAML currently lists successful responses; the invalid-type `400` behavior is implemented in the controller and covered by its tests and the Postman examples. The health endpoint is an HTTP availability check, rather than a report of individual dependency status.
 

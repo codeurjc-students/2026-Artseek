@@ -6,15 +6,7 @@ servers:
 - url: http://localhost:8080
   description: Generated server url
 paths:
-  /api/health:
-    get:
-      tags:
-      - health-controller
-      operationId: health
-      responses:
-        "200":
-          description: OK
-  /api/1.0/categories/{type}:
+  /api/v1/categories/{type}:
     get:
       tags:
       - category-rest-controller
@@ -34,7 +26,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/CategoryDTO"
-  /api/1.0/categories/types/used:
+  /api/v1/categories/types/used:
     get:
       tags:
       - category-rest-controller
@@ -48,6 +40,14 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/CategoryTypeDTO"
+  /api/health:
+    get:
+      tags:
+      - health-controller
+      operationId: health
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
     CategoryDTO:
