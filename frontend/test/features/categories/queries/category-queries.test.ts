@@ -11,7 +11,7 @@ describe('categories by type queries', () => {
 
     await expect(queryClient.query(options)).resolves.toEqual(categories)
     await expect(queryClient.query(options)).resolves.toEqual(categories)
-    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/1.0/categories/painting', {
+    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/v1/categories/painting', {
       signal: expect.any(AbortSignal),
     })
   })
@@ -26,7 +26,7 @@ describe('categories by type queries', () => {
     await expect(queryClient.query(categoriesByTypeQueryOptions('sculpture'))).resolves.toEqual(sculpture)
     await expect(queryClient.query(categoriesByTypeQueryOptions('painting'))).resolves.toEqual(categories)
     expect(mockFetch()).toHaveBeenCalledTimes(2)
-    expect(mockFetch()).toHaveBeenNthCalledWith(2, '/api/1.0/categories/sculpture', { signal: expect.any(AbortSignal) })
+    expect(mockFetch()).toHaveBeenNthCalledWith(2, '/api/v1/categories/sculpture', { signal: expect.any(AbortSignal) })
   })
 
   it('treats an empty collection as successful data', async () => {

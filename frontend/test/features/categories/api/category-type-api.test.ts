@@ -9,7 +9,7 @@ describe('used category types API', () => {
     mockFetch().mockResolvedValue(Response.json(categoryTypes))
 
     await expect(fetchUsedCategoryTypes(signal)).resolves.toEqual(categoryTypes)
-    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/1.0/categories/types/used', { signal })
+    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/v1/categories/types/used', { signal })
   })
 
   it('accepts an empty collection', async () => {
@@ -43,6 +43,6 @@ describe('used category types API', () => {
     const failure = new DOMException('Request aborted', 'AbortError')
     mockFetch().mockRejectedValue(failure)
     await expect(fetchUsedCategoryTypes(signal)).rejects.toBe(failure)
-    expect(mockFetch()).toHaveBeenCalledWith('/api/1.0/categories/types/used', { signal })
+    expect(mockFetch()).toHaveBeenCalledWith('/api/v1/categories/types/used', { signal })
   })
 })

@@ -5,7 +5,7 @@ import { fetchCategoriesByType } from '../../../../app/features/categories/api/c
 
 describe('categories by type API', () => {
   const request = (signal?: AbortSignal) => fetchCategoriesByType('digital art/3D', signal)
-  const endpoint = '/api/1.0/categories/digital%20art%2F3D'
+  const endpoint = '/api/v1/categories/digital%20art%2F3D'
   it('loads validated data from the endpoint and forwards the abort signal', async () => {
     const signal = new AbortController().signal
     mockFetch().mockResolvedValue(Response.json(categories))
