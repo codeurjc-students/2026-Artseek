@@ -2,16 +2,13 @@ package com.artseek.infrastructure.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.artseek.common.FullContextIntegrationTest;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
-@Transactional
-class DatabaseInitializerIntegrationTests {
+class DatabaseInitializerIntegrationTests extends FullContextIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
