@@ -1,12 +1,12 @@
 import type { Route } from './+types/HealthRoute'
-import { backendStatusQueryOptions } from '../features/backend-status/queries/backend-status-queries'
-import { queryClient } from '../lib/query-client'
+import { fetchBackendStatus } from '../features/backend-status/api/backend-status-api'
 
-export async function clientLoader() {
+export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   try {
-    const backendStatus = await queryClient.query(backendStatusQueryOptions())
+    const backendStatus = await fetchBackendStatus(request.signal)
     return { backendStatus }
   } catch {
+    request.signal.throwIfAborted()
     // Failure is a diagnostic result here, not a reason to hide the page.
     return { backendStatus: null }
   }

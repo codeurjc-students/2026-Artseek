@@ -1,12 +1,11 @@
 import { Alert, ListGroup } from 'react-bootstrap'
 import { Link } from 'react-router'
 
-import { usedCategoryTypesQueryOptions } from '../features/categories/queries/category-type-queries'
-import { queryClient } from '../lib/query-client'
+import { fetchUsedCategoryTypes } from '../features/categories/api/category-type-api'
 import type { Route } from './+types/HomeRoute'
 
-export async function clientLoader() {
-  const categoryTypes = await queryClient.query(usedCategoryTypesQueryOptions())
+export async function clientLoader({ request }: Route.ClientLoaderArgs) {
+  const categoryTypes = await fetchUsedCategoryTypes(request.signal)
   return { categoryTypes }
 }
 

@@ -9,7 +9,9 @@ describe('used category types API', () => {
     mockFetch().mockResolvedValue(Response.json(categoryTypes))
 
     await expect(fetchUsedCategoryTypes(signal)).resolves.toEqual(categoryTypes)
-    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/v1/categories/types/used', { signal })
+    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/v1/categories/types/used', {
+      signal, headers: expect.any(Headers),
+    })
   })
 
   it('accepts an empty collection', async () => {
@@ -19,7 +21,7 @@ describe('used category types API', () => {
 
   it('rejects unsuccessful HTTP responses', async () => {
     mockFetch().mockResolvedValue(new Response(null, { status: 503 }))
-    await expect(fetchUsedCategoryTypes()).rejects.toThrow('Used category types request failed with HTTP 503')
+    await expect(fetchUsedCategoryTypes()).rejects.toThrow('HTTP 503')
   })
 
   it.each([[null], [{}], [[null]], [[{ value: 1 }]], [[{}]]])('rejects invalid response data: %j', async (value) => {
@@ -30,6 +32,11 @@ describe('used category types API', () => {
   it('rejects malformed JSON', async () => {
     mockFetch().mockResolvedValue(new Response('not JSON'))
     await expect(fetchUsedCategoryTypes()).rejects.toBeInstanceOf(SyntaxError)
+  })
+
+  it('rejects a bodyless response instead of treating it as an empty collection', async () => {
+    mockFetch().mockResolvedValue(new Response(null, { status: 204 }))
+    await expect(fetchUsedCategoryTypes()).rejects.toThrow('Used category types response has an invalid shape')
   })
 
   it('propagates network failures', async () => {
@@ -43,6 +50,8 @@ describe('used category types API', () => {
     const failure = new DOMException('Request aborted', 'AbortError')
     mockFetch().mockRejectedValue(failure)
     await expect(fetchUsedCategoryTypes(signal)).rejects.toBe(failure)
-    expect(mockFetch()).toHaveBeenCalledWith('/api/v1/categories/types/used', { signal })
+    expect(mockFetch()).toHaveBeenCalledWith('/api/v1/categories/types/used', {
+      signal, headers: expect.any(Headers),
+    })
   })
 })
