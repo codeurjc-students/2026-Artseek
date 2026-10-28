@@ -23,7 +23,7 @@ The planned architecture also includes a separate context for AI artwork analysi
 | Aspect | Current implementation |
 | --- | --- |
 | Type | Web SPA and REST API, with one backend application and one relational database. |
-| Technologies | React, TypeScript, React Router, TanStack Query, React-Bootstrap, Bootstrap and Tailwind CSS; Java, Spring Boot, Spring Data JPA and PostgreSQL. |
+| Technologies | React, TypeScript, React Router, React-Bootstrap, Bootstrap and Tailwind CSS; Java, Spring Boot, Spring Data JPA and PostgreSQL. |
 | Tools | Visual Studio Code with Spring Boot extensions, IntelliJ IDEA, Git, GitHub, Maven, Node.js, pnpm, Vite, Docker, Postman and OpenAPI tooling. |
 | Quality control | Backend unit, integration and HTTP system tests; frontend unit tests, TypeScript checks and production builds; GitHub Actions and required checks before merging. Backend SonarQube Cloud static analysis and JaCoCo coverage feed a quality gate in PR quality assurance; see the setup guide for service configuration and required checks. |
 | Deployment | Local frontend and backend processes, with PostgreSQL 17 in a Docker container. Application container images and a production deployment have not been configured. |
@@ -41,7 +41,7 @@ The backend dependencies are declared in [`backend/pom.xml`](../backend/pom.xml)
 | [PostgreSQL](https://www.postgresql.org/docs/17/) 17 | Stores categories in the local development database. Hibernate currently updates the schema through `spring.jpa.hibernate.ddl-auto=update`. |
 | [React](https://react.dev/) 19.3.0 and [TypeScript](https://www.typescriptlang.org/) 5.9.3 | Define the frontend components and typed API contracts. TypeScript is compiled to JavaScript for the browser. |
 | [React Router](https://reactrouter.com/) 8.4.0 | Defines the home, category and health routes. Framework mode is configured with `ssr: false`, so the application runs as a client SPA. |
-| [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) 5.104.2 | Provides the shared server-data cache, query keys, request deduplication, cancellation support and retries. Client loaders use the cache; React Router coordinates route loading and errors. |
+| [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) | The application-owned `app/utils/api-request.ts` wrapper centralizes native request options, response parsing and unsuccessful HTTP responses. Feature API services own endpoints, validation and DTO mapping. |
 | [React-Bootstrap](https://react-bootstrap.github.io/) 2.10.10, [Bootstrap](https://getbootstrap.com/) 5.3.8 and [Tailwind CSS](https://tailwindcss.com/) 4.3.3 | Provide interface components and styling. Bootstrap's stylesheet is imported once in the application root. |
 
 [Apache Kafka](https://kafka.apache.org/intro) is selected for the planned asynchronous communication between the artwork and AI analysis contexts in both deployment options. Kafka and the analysis component are not yet configured in the repository. Analysis will call an external AI model API; the provider, model and deployment configuration remain to be defined.
@@ -146,21 +146,21 @@ Controllers depend on the application `Mediator` contract. `FindUsedCategoryType
 The frontend groups backend communication by feature under `app/features/`. Route data follows this flow:
 
 ```text
-clientLoader -> shared QueryClient + feature query options -> API function -> REST API
+clientLoader -> feature API service -> utils/api-request -> fetch -> REST API
 clientLoader result -> loaderData -> route component
 ```
 
-The `categories` feature contains HTTP functions in `api/`, query keys and options factories in `queries/`, and named API contracts in `model/`. Group related operations by resource: `category-type-api.ts` and `category-type-queries.ts` contain category-type operations; category types remain part of the categories feature. DTOs such as `CategoryTypeDTO` have their own model files and use simple TypeScript types, not classes. The `backend-status` feature checks backend availability. API functions use `fetch`, pass the query's abort signal, reject unsuccessful HTTP responses and validate category response shapes.
+The `categories` feature contains API services in `api/` and named contracts in `model/`. Group related operations by resource: `category-type-api.ts` contains category-type operations; category types remain part of the categories feature. DTOs such as `CategoryTypeDTO` have their own model files and use simple TypeScript types, not classes. The `backend-status` feature checks backend availability. All feature services call `apiRequest<T>` from `app/utils/api-request.ts` with their DTO result types; services retain resource-specific runtime validation and DTO mapping.
 
-Export one browser-lifetime `queryClient` from `app/lib/query-client.ts`. Each route's `clientLoader` imports that instance, awaits `queryClient.query(...)` with feature query options, and returns data rendered through typed `Route.ComponentProps.loaderData`. Do not create a client per route or add a query hook just to read the same data again. Path parameters such as `params.categoryType` are loader inputs and must also be included in the query key.
+Each route's `clientLoader` calls the relevant feature API service and returns data rendered through typed `Route.ComponentProps.loaderData`. Path parameters such as `params.categoryType` are inputs to the API function. Pass `request.signal` through the service to the wrapper so React Router can cancel interrupted navigation requests and discard late results. Components render the loader result instead of independently requesting the same route data.
 
-Category and used-category-type options use `staleTime: 60_000`; health uses `staleTime: 0` to check availability on each visit. All three use `retry: 1`. Loaders can execute again during navigation while reusing a fresh cache entry without another HTTP request. Missing, stale or invalidated data is fetched when the loader next queries it. Cache entries remain subject to garbage collection; freshness does not guarantee indefinite retention.
+The shared wrapper accepts a request path plus native `RequestInit` options, including headers, any HTTP method, body, credentials and cancellation signal, preserving supplied values. It copies headers and defaults string bodies to JSON when no content type is supplied. Feature APIs accept domain inputs and an optional cancellation signal, constructing their own request options internally. JSON responses are parsed once; successful empty responses return `undefined`, with `void` used for no-content operations such as health checks. An unsuccessful response throws `HttpError` with HTTP status and status text before parsing, independently of its body format. Network, cancellation and malformed JSON failures propagate unchanged. Category services validate arrays, including empty arrays, and reject absent bodies or invalid DTOs.
 
-`loaderData` is a snapshot, not a cache subscription. This design provides cache reuse, deduplication, retries and targeted invalidation, but does not automatically refresh an open page when the cache changes. Initial loading uses the root `HydrateFallback`; pending navigations use root-level `useNavigation` feedback. Unexpected loading errors reach the single `root.tsx` error boundary rather than route-specific boundaries. The health loader handles unavailable-backend failures explicitly, returning `backendStatus: null` for the health page's status message. Successful empty category responses render empty states.
+Every loader execution makes a new request. There is no application response cache, automatic retry, polling or focus refresh. `loaderData` remains a snapshot until navigation or explicit router revalidation runs the loader again. Initial loading uses the root `HydrateFallback`; pending navigations use root-level `useNavigation` feedback. Unexpected loading errors reach the single `root.tsx` error boundary. The health loader handles unavailable-backend failures explicitly, returning `backendStatus: null` for the health page's status message, while propagating cancellation. Successful empty category arrays render empty states.
 
-Use `useActionState` for straightforward form submissions and validation results, calling feature API functions from the action. After a successful write, invalidate affected keys on the shared client and revalidate the route or navigate when its displayed loader data must be refreshed. Invalidation alone does not replace a rendered snapshot.
+Use `useActionState` for straightforward form submissions and validation results, calling feature API functions from the action. After a successful write, call `useRevalidator().revalidate()` or navigate to refresh displayed route data from the backend.
 
-Add custom query hooks only for reactive component needs such as live cache updates, polling or component-driven queries; add mutation hooks when writes need capabilities such as optimistic updates or coordinated mutation state. These hooks belong in the feature's optional `hooks/` folder and reuse its query options. When hooks are needed, a `QueryClientProvider` must expose the **same imported client instance used by loaders**, not a second client. Loaders access the client directly, not through React context; loader-only queries do not require the provider. Keep Zustand reserved for genuinely shared browser-only state and do not create a store for the current pages.
+Keep browser-only interaction state local in React. Add custom hooks only when a feature needs reusable React behavior, and introduce Zustand only for shared browser-only state. Keep route data in `loaderData` instead of mirroring it in a UI store.
 
 The [frontend architecture standard](../frontend/AGENTS.md) contains the full responsibilities and naming rules. The component-library choice and existing styles are unchanged by this data-loading design.
 
@@ -410,8 +410,8 @@ pnpm build
 `pnpm test` runs all Vitest unit tests once, without watch mode, and returns a
 nonzero exit code when an assertion fails. Requests use isolated fetch mocks;
 the backend and database can remain stopped. Tests live under `frontend/test/`,
-mirroring the directories in `frontend/app/`. They cover API validation, query
-caching, client loaders, rendered pages, shared loading/error UI, and backend
+mirroring the directories in `frontend/app/`. They cover the fetch wrapper,
+request options and cancellation, API validation, client loaders, rendered pages, fresh data after reload, and backend
 availability. See the [frontend testing guide](../frontend/README.md#unit-tests)
 for fixtures, mocking, focused runs, watch mode, and adding tests.
 
