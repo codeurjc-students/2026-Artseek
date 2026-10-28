@@ -137,3 +137,15 @@ AI-generated material is treated as a design and development aid. All proposals 
 - **Student direction:** The student configured the `SONAR_TOKEN` GitHub Actions secret, supplied the exact Sonar project URL, and clarified that Sonar should analyze only the backend. Frontend testing, type checking, and building remain part of CI. The student requested instructions for manually updating the GitHub ruleset; no ruleset change was applied by Codex.
 - **Verification:** All 49 backend tests passed and JaCoCo generated valid HTML and XML reports. All 55 frontend tests passed using one local worker after a parallel-worker startup timeout; type checking and production building passed. The public Sonar API confirmed the project key, an existing `main` baseline, and the assigned Sonar way gate and its new-code conditions. A GitHub Actions scan and a deliberate red-gate PR still require remote verification.
 - **Complementary tools and resources:** Maven, JaCoCo, pnpm, Vitest, GitHub CLI, the public SonarQube Cloud API, and official SonarSource and JaCoCo documentation. No analysis credentials were read or committed.
+
+## AI-2026-10-28-001 — TanStack removal and centralized API request contract
+
+- **Date:** 28 October 2026.
+- **Phase:** Frontend architecture and HTTP communication.
+- **Objective:** Remove TanStack Query from the frontend and replace its query-client layer with a simpler centralized HTTP request contract used by feature API services and React Router client loaders.
+- **Tool:** OpenAI Codex, desktop application.
+- **Specific version/model:** GPT-6.1 Sol.
+- **Configuration:** `high` reasoning level, agentic Default mode, interactive chat workflow.
+- **How it was used:** Codex removed the TanStack dependency and its query configuration, then implemented the generic `apiRequest<T>` contract in `frontend/app/utils/api-request.ts`. The utility centralizes native `fetch` calls, preserves request options and abort signals, supplies the JSON content type when appropriate, parses successful responses, and raises a typed `HttpError` for unsuccessful HTTP responses. Existing feature API services, client loaders, tests, and frontend architecture documentation were adapted to use the new contract.
+- **Complementary tools and resources:** React Router client loaders, the browser Fetch API, TypeScript, Vitest, pnpm, and local file editing were used. No external plugins, skills, MCP servers, or connectors are recorded for this use.
+- **Result and student review:** Frontend server-data loading now follows the centralized `clientLoader -> feature API service -> apiRequest -> fetch` flow without TanStack Query.
