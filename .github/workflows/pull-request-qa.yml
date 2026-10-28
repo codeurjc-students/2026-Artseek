@@ -31,7 +31,10 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
-      - name: Verify server and generate coverage
+      - name: Check Docker for PostgreSQL Testcontainers
+        run: docker info
+
+      - name: Verify server with PostgreSQL Testcontainers and generate coverage
         run: mvn --batch-mode --no-transfer-progress verify
 
       - name: Upload backend analysis files

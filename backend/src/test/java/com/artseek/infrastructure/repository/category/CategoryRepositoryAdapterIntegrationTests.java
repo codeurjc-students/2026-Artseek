@@ -2,24 +2,31 @@ package com.artseek.infrastructure.repository.category;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.artseek.common.JpaIntegrationTest;
 import com.artseek.domain.model.category.Category;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@DataJpaTest
 @Import(CategoryRepositoryAdapter.class)
-class CategoryRepositoryAdapterIntegrationTests {
+class CategoryRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Test
+    void usesAnIsolatedPostgreSqlDatabase() {
+        assertThat(jdbcTemplate.queryForObject("select current_database()", String.class))
+                .isEqualTo("artseek_test");
+        assertThat(jdbcTemplate.queryForObject("select version()", String.class))
+                .startsWith("PostgreSQL 17.11 ");
+    }
 
     @Test
     void savesACategoryAndAssignsItsIdentifier() {

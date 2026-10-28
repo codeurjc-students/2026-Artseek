@@ -3,20 +3,17 @@ package com.artseek.application.category.findbytype;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.artseek.application.category.CategoryDTO;
-import com.artseek.application.category.findbytype.FindCategoriesByTypeQuery;
-import com.artseek.application.category.findbytype.FindCategoriesByTypeQueryHandler;
+import com.artseek.common.JpaIntegrationTest;
 import com.artseek.domain.model.category.Category;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import com.artseek.infrastructure.repository.category.CategoryRepositoryAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
-@DataJpaTest
 @Import({CategoryRepositoryAdapter.class, FindCategoriesByTypeQueryHandler.class})
-class FindCategoriesByTypeQueryHandlerIntegrationTests {
+class FindCategoriesByTypeQueryHandlerIntegrationTests extends JpaIntegrationTest {
 
     @Autowired
     private FindCategoriesByTypeQueryHandler handler;

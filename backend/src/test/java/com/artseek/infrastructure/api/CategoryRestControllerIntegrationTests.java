@@ -8,20 +8,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.artseek.common.FullContextIntegrationTest;
 import com.artseek.domain.model.category.Category;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
-class CategoryRestControllerIntegrationTests {
+class CategoryRestControllerIntegrationTests extends FullContextIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
