@@ -149,3 +149,16 @@ AI-generated material is treated as a design and development aid. All proposals 
 - **How it was used:** Codex removed the TanStack dependency and its query configuration, then implemented the generic `apiRequest<T>` contract in `frontend/app/utils/api-request.ts`. The utility centralizes native `fetch` calls, preserves request options and abort signals, supplies the JSON content type when appropriate, parses successful responses, and raises a typed `HttpError` for unsuccessful HTTP responses. Existing feature API services, client loaders, tests, and frontend architecture documentation were adapted to use the new contract.
 - **Complementary tools and resources:** React Router client loaders, the browser Fetch API, TypeScript, Vitest, pnpm, and local file editing were used. No external plugins, skills, MCP servers, or connectors are recorded for this use.
 - **Result and student review:** Frontend server-data loading now follows the centralized `clientLoader -> feature API service -> apiRequest -> fetch` flow without TanStack Query.
+
+## AI-2026-10-28-002 — Isolated PostgreSQL test container and test base classes
+
+- **Date:** 28 October 2026.
+- **Phase:** Backend test infrastructure and database isolation.
+- **Objective:** Run backend integration and system tests against a dedicated disposable PostgreSQL container instead of the development database.
+- **Tool:** OpenAI Codex, desktop application.
+- **Specific version/model:** GPT-6.1 Sol.
+- **Configuration:** `high` reasoning level, agentic Default mode, interactive chat workflow.
+- **Student design and direction:** The student proposed centralizing the container integration behind the abstract `IntegrationTest` base class so it would be the single inheritance entry point for container configuration. The student also designed the use of specialized base classes for the different test scopes: `JpaIntegrationTest`, `FullContextIntegrationTest`, and `SystemTest`.
+- **How it was used:** Codex implemented the Testcontainers configuration in `PostgresTestConfiguration`, using a dedicated `postgres:17.11` container, an isolated `artseek_test` database, dynamically allocated ports, and Spring Boot `@ServiceConnection`. `IntegrationTest` imports that configuration once, while the specialized base classes inherit it and supply the appropriate JPA slice, full application context, transaction, or real HTTP-server configuration. Existing database-backed tests were migrated to the corresponding base class.
+- **Complementary tools and resources:** Spring Boot Testcontainers, PostgreSQL Testcontainers, Docker, JUnit 5, Spring Data JPA test support, and Maven were used. No external plugins, skills, MCP servers, or connectors are recorded for this use.
+- **Result and student review:** Integration and system tests now use isolated disposable PostgreSQL instances without connecting to the development database, while the shared base-class hierarchy keeps container and Spring test-scope configuration centralized and consistent.

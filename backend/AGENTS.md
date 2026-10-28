@@ -238,21 +238,44 @@ Keep separate `<Class>UnitTests` and `<Class>IntegrationTests` classes in matchi
 
 System tests use the suffix `SystemTests` and mirror their controller's production package under `src/test/java`, alongside its other tests. For example, `HealthEndpointSystemTests` belongs in `com/artseek/infrastructure/api/health`, matching `HealthController` under `src/main/java`.
 
-| Subject | Unit tests | Integration tests |
+Shared abstract bases live under `src/test/java/com/artseek/common`:
+
+- `IntegrationTest` imports `PostgresTestConfiguration` only. It does not declare `@SpringBootTest`, `@DataJpaTest` or `@Transactional`.
+- `JpaIntegrationTest extends IntegrationTest` declares `@DataJpaTest` and `@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)`. It provides a focused persistence slice with automatic rollback after each test.
+- `FullContextIntegrationTest extends IntegrationTest` declares `@SpringBootTest` and `@Transactional`. It loads the full application in the default mock web environment and rolls back test-thread writes after each test. Use it for full-context integration tests, including read-only application tests; it does not start a listening HTTP server.
+- `SystemTest extends IntegrationTest` declares `@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)` and `@AutoConfigureRestTestClient`, and exposes the injected, protected `RestTestClient restTestClient`. It does not declare `@Transactional` because HTTP server writes use separate transactions.
+
+Concrete test classes must follow this inheritance and annotation policy:
+
+| Test category | Extend | Additional annotations and setup on the concrete class |
 | --- | --- | --- |
-| Domain | Plain JUnit; construct entities directly | Only when persistence behavior needs verification |
-| Handlers / application services | `MockitoExtension`, mocked repository ports, direct construction or `@InjectMocks` | `@DataJpaTest` + `@Import` of the handler/service and real repository adapter; Spring Data JPA and H2 |
-| Repository adapters | Mock Spring Data and verify delegation | `@DataJpaTest` + `@Import` of the real adapter |
-| REST controllers | `@WebMvcTest` + `MockMvc`; `@MockitoBean` for all constructor dependencies, stubbing/verifying `Mediator.send()` or `dispatch()` where used | **Required:** `@SpringBootTest` + `@AutoConfigureMockMvc` + `@Transactional`; real mediator, handlers, adapters, and test database |
-| Mediator | Construct directly with explicit sample-handler lists; no Spring context | Add separately when verifying Spring wiring |
+| Domain unit tests | No shared Spring base | Plain JUnit `@Test`; construct entities directly. |
+| Handler / application-service unit tests | No shared Spring base | `@ExtendWith(MockitoExtension.class)`, mocked repository ports and direct construction or `@InjectMocks`. |
+| Repository adapter unit tests | No shared Spring base | `@ExtendWith(MockitoExtension.class)`; mock Spring Data and verify delegation. |
+| Mediator unit tests | No shared Spring base | Plain JUnit `@Test`; construct directly with explicit sample-handler lists and no Spring context. |
+| Controller web-slice tests (`*UnitTests`) | No shared Spring base | `@WebMvcTest(Controller.class)`, injected MockMvc and `@MockitoBean` for every constructor dependency; stub/verify the mediator where used. |
+| Handler / application-service integration tests | `JpaIntegrationTest` | `@Import` the handler/service and required real repository adapters. |
+| Repository adapter integration tests | `JpaIntegrationTest` | `@Import` the real adapter being tested. |
+| Controller integration tests | `FullContextIntegrationTest` | **Required:** `@AutoConfigureMockMvc`; real mediator, handlers, adapters and persistence. Full-context and transaction annotations are inherited. |
+| Application / bootstrap integration tests | `FullContextIntegrationTest` | JUnit `@Test` methods and injected collaborators; inherit full-context configuration and rollback even for read-only tests. |
+| HTTP system tests | `SystemTest` | JUnit `@Test` methods using the inherited `restTestClient`; explicit cleanup for committed fixtures and server-side writes. |
+
+Concrete JPA/full-context/system tests inherit their Spring test annotations from their base; do not duplicate them or combine `@DataJpaTest` with `@SpringBootTest`. Keep focused imports on concrete JPA tests. All concrete classes declare their own `@Test` methods. Add domain persistence integration coverage only when persistence behavior needs verification, using `JpaIntegrationTest`.
+
+Choose scope by the collaboration being verified. `JpaIntegrationTest` loads persistence infrastructure and repositories, plus explicitly imported handlers/services and adapters: test mappings, queries, database-backed filtering, generated IDs and DTO mapping by invoking the handler/adapter directly. It does not automatically load controllers, the mediator or unrelated application beans. `FullContextIntegrationTest` loads the complete application and verifies real dependency wiring or behavior across layers; with MockMvc, controller tests exercise routing, validation, serialization and the real controller/mediator/handler/adapter/database path without starting an HTTP server. Application/bootstrap tests can instead assert context wiring or initializer behavior. A full context makes beans available; each test's entry point and assertions still determine its actual coverage. Both bases use PostgreSQL and test-transaction rollback. `SystemTest` adds real HTTP transport and requires explicit cleanup of committed writes.
 
 - Field `@Autowired` is acceptable in Spring tests: the test framework owns their lifecycle and dependency setup. Production classes use constructor injection with `final` fields to make required dependencies explicit and allow plain Java construction. `@Autowired` itself is not forbidden; a single production constructor does not need the annotation.
 - Handler unit tests cover query/command type registration, DTO mapping, empty results, validation, rejected-input exception data, and absence of repository calls for invalid input. Verify immutable snapshots where that is part of the output contract.
 - Handler integration tests verify persistence-backed behavior: generated IDs in DTOs, filtering, distinct/order semantics, and exclusion of supported-but-unused types. Controller tests verify routing, JSON, delegation, and semantic HTTP errors.
 - Use controlled test databases and explicit fixtures, never the development/production database. Exact result assertions are appropriate; do not assume generated IDs or unspecified ordering.
-- `@DataJpaTest` rolls back after each test by default. Full-context tests need `@Transactional` for rollback of same-thread writes; startup hooks execute before that transaction. Keep `local` disabled and test the initializer by constructing it and calling `init()` within the test transaction.
+- Keep container declarations exclusively in `src/test/java/com/artseek/infrastructure/config/PostgresTestConfiguration`. The `common.IntegrationTest` base imports this configuration; concrete database tests inherit it through `JpaIntegrationTest`, `FullContextIntegrationTest` or `SystemTest`, as specified above. Plain unit and controller web-slice tests must not extend any of these bases. Use test-scoped `spring-boot-testcontainers` and `testcontainers-postgresql` dependencies managed by Spring Boot.
+- Use the pinned `postgres:17.11` image, matching the development PostgreSQL 17 engine and inspected local image version, with a separate `artseek_test` database and dynamically allocated host ports. `@ServiceConnection` supplies connection details automatically. Do not connect tests to the development database, bind port 5432, mount its volume or fall back to an embedded database.
+- Every JPA slice must extend `JpaIntegrationTest` to inherit `@DataJpaTest` and disabled datasource replacement, and retain its focused handler/adapter imports. Full-context/controller/system tests inherit the container configuration through their appropriate base while retaining real application wiring.
+- Let Spring manage the container bean lifecycle: one container per cached context, shared by compatible tests, stopped only after its dependent JPA/datasource beans are destroyed. Do not use JUnit `@Container` lifecycle management, per-method containers or persistent container reuse. Different context configurations receive separate databases, avoiding shared `create-drop` schema interference.
+- Preserve Hibernate `create-drop` for tests and leave production datasource/schema configuration unchanged. Docker is required for database tests; missing Docker must fail clearly rather than skip tests. Plain unit and web-slice tests must run without Docker or database access.
+- `JpaIntegrationTest` inherits rollback through `@DataJpaTest`; `FullContextIntegrationTest` provides it through `@Transactional`. This covers same-thread writes, including synchronous MockMvc requests. Startup hooks execute before the test transaction. Keep `local` disabled and test the initializer by constructing it and calling `init()` manually within the inherited rollback transaction.
 - Sample mediator requests/handlers must be private nested types without Spring annotations. Explicit test registries exclude production handlers; test fixtures must never register with the real mediator.
-- HTTP system tests follow `HealthEndpointSystemTests`: `@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)`, `@AutoConfigureRestTestClient`, and an injected `RestTestClient` making requests through the running HTTP server. Verify public endpoint behavior with real application wiring. Server-side writes run outside the test thread's transaction, so arrange explicit cleanup for mutating system tests rather than relying on test-level `@Transactional` rollback.
+- HTTP system tests extend `SystemTest`, following `HealthEndpointSystemTests`, and use the inherited `restTestClient` through the running HTTP server. Keep these tests in the same relative package as their controller. Do not add `@DataJpaTest` or rely on test-level `@Transactional` to roll back HTTP writes: server-side writes run in another thread with their own transactions. Commit fixture setup before making HTTP requests. For mutating system tests, clean up committed fixtures and server writes after each test, even after assertion failures, using focused `@AfterEach` repository cleanup or `@Sql(executionPhase = AFTER_TEST_METHOD, config = @SqlConfig(transactionMode = ISOLATED))` cleanup scripts. Remove dependent rows as needed and delete only test-owned data. Read-only health system tests need no cleanup.
 
 Run the complete backend suite after code/test changes:
 
@@ -261,6 +284,8 @@ mvn test
 ```
 
 The project targets the Java version declared in the repository-root `.java-version` file (currently Java 25 LTS). Keep Maven, CI, and local `JAVA_HOME` aligned with that file before running Maven.
+
+For unit and controller web-slice tests without Docker, run `mvn test "-Dtest=*UnitTests" "-Dsurefire.failIfNoSpecifiedTests=true"`. With Docker running, `mvn --batch-mode --no-transfer-progress verify` runs the complete suite and generates JaCoCo reports. The PR/main workflow checks `docker info` before verification; the development workflow runs only the Docker-independent group. See `README.md` for fixture ownership, HTTP cleanup, lifecycle and isolation checks.
 
 ## Current Architectural Decisions Summary
 
