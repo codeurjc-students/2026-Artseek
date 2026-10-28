@@ -3,8 +3,6 @@ package com.artseek.application.category.findbytype;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.artseek.application.category.CategoryDTO;
-import com.artseek.application.category.findbytype.FindCategoriesByTypeQuery;
-import com.artseek.application.category.findbytype.FindCategoriesByTypeQueryHandler;
 import com.artseek.common.JpaIntegrationTest;
 import com.artseek.domain.model.category.Category;
 import com.artseek.domain.model.category.CategoryType;
