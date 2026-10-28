@@ -16,7 +16,7 @@ describe('Category route', () => {
     expect(screen.getByText('Oil painting')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'painting' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to category types' })).toHaveAttribute('href', '/')
-    expect(mockFetch()).toHaveBeenCalledWith('/api/1.0/categories/painting', { signal: expect.any(AbortSignal) })
+    expect(mockFetch()).toHaveBeenCalledWith('/api/v1/categories/painting', { signal: expect.any(AbortSignal) })
   })
 
   it('renders the empty state from loaded data', async () => {

@@ -18,7 +18,7 @@ export async function fetchCategoriesByType(
   signal?: AbortSignal,
 ): Promise<CategoryDTO[]> {
   const response = await fetch(
-    `/api/1.0/categories/${encodeURIComponent(type)}`,
+    `/api/v1/categories/${encodeURIComponent(type)}`,
     { signal },
   )
 

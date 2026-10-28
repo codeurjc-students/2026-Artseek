@@ -12,7 +12,7 @@ function isCategoryTypeDTO(value: unknown): value is CategoryTypeDTO {
 export async function fetchUsedCategoryTypes(
   signal?: AbortSignal,
 ): Promise<CategoryTypeDTO[]> {
-  const response = await fetch('/api/1.0/categories/types/used', { signal })
+  const response = await fetch('/api/v1/categories/types/used', { signal })
 
   if (!response.ok) {
     throw new Error(`Used category types request failed with HTTP ${response.status}`)

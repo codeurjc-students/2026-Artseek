@@ -11,7 +11,7 @@ describe('used category types queries', () => {
 
     await expect(queryClient.query(options)).resolves.toEqual(categoryTypes)
     await expect(queryClient.query(options)).resolves.toEqual(categoryTypes)
-    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/1.0/categories/types/used', {
+    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith('/api/v1/categories/types/used', {
       signal: expect.any(AbortSignal),
     })
   })
