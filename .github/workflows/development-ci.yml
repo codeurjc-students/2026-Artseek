@@ -30,7 +30,7 @@ jobs:
       - name: Compile server
         run: mvn --batch-mode --no-transfer-progress clean compile
 
-      - name: Run server unit tests
+      - name: Run server unit and web-slice tests without Docker
         run: mvn --batch-mode --no-transfer-progress -Dtest='*UnitTests' -Dsurefire.failIfNoSpecifiedTests=true test
 
   client:
