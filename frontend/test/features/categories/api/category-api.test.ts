@@ -11,7 +11,7 @@ describe('categories by type API', () => {
     mockFetch().mockResolvedValue(Response.json(categories))
 
     await expect(request(signal)).resolves.toEqual(categories)
-    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith(endpoint, { signal })
+    expect(mockFetch()).toHaveBeenCalledExactlyOnceWith(endpoint, { signal, headers: expect.any(Headers) })
   })
 
   it('accepts an empty collection', async () => {
@@ -21,7 +21,7 @@ describe('categories by type API', () => {
 
   it('rejects unsuccessful HTTP responses', async () => {
     mockFetch().mockResolvedValue(new Response(null, { status: 503 }))
-    await expect(request()).rejects.toThrow('Categories request failed with HTTP 503')
+    await expect(request()).rejects.toThrow('HTTP 503')
   })
 
   it.each([
@@ -37,6 +37,11 @@ describe('categories by type API', () => {
     await expect(request()).rejects.toBeInstanceOf(SyntaxError)
   })
 
+  it('rejects a bodyless response instead of treating it as an empty collection', async () => {
+    mockFetch().mockResolvedValue(new Response(null, { status: 204 }))
+    await expect(request()).rejects.toThrow('Categories response has an invalid shape')
+  })
+
   it('propagates network failures', async () => {
     const failure = new TypeError('Network unavailable')
     mockFetch().mockRejectedValue(failure)
@@ -48,6 +53,6 @@ describe('categories by type API', () => {
     const failure = new DOMException('Request aborted', 'AbortError')
     mockFetch().mockRejectedValue(failure)
     await expect(request(signal)).rejects.toBe(failure)
-    expect(mockFetch()).toHaveBeenCalledWith(endpoint, { signal })
+    expect(mockFetch()).toHaveBeenCalledWith(endpoint, { signal, headers: expect.any(Headers) })
   })
 })

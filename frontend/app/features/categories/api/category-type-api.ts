@@ -1,4 +1,5 @@
 import type { CategoryTypeDTO } from '../model/CategoryTypeDTO'
+import { apiRequest } from '../../../utils/api-request'
 
 function isCategoryTypeDTO(value: unknown): value is CategoryTypeDTO {
   return (
@@ -12,13 +13,7 @@ function isCategoryTypeDTO(value: unknown): value is CategoryTypeDTO {
 export async function fetchUsedCategoryTypes(
   signal?: AbortSignal,
 ): Promise<CategoryTypeDTO[]> {
-  const response = await fetch('/api/v1/categories/types/used', { signal })
-
-  if (!response.ok) {
-    throw new Error(`Used category types request failed with HTTP ${response.status}`)
-  }
-
-  const data: unknown = await response.json()
+  const data = await apiRequest<CategoryTypeDTO[]>('/api/v1/categories/types/used', { signal })
 
   if (!Array.isArray(data) || !data.every(isCategoryTypeDTO)) {
     throw new Error('Used category types response has an invalid shape')

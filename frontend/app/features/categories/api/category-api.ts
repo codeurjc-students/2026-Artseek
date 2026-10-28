@@ -1,4 +1,5 @@
 import type { CategoryDTO } from '../model/CategoryDTO'
+import { apiRequest } from '../../../utils/api-request'
 
 function isCategoryDTO(value: unknown): value is CategoryDTO {
   return (
@@ -17,16 +18,10 @@ export async function fetchCategoriesByType(
   type: string,
   signal?: AbortSignal,
 ): Promise<CategoryDTO[]> {
-  const response = await fetch(
+  const data = await apiRequest<CategoryDTO[]>(
     `/api/v1/categories/${encodeURIComponent(type)}`,
     { signal },
   )
-
-  if (!response.ok) {
-    throw new Error(`Categories request failed with HTTP ${response.status}`)
-  }
-
-  const data: unknown = await response.json()
 
   if (!Array.isArray(data) || !data.every(isCategoryDTO)) {
     throw new Error('Categories response has an invalid shape')
