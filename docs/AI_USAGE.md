@@ -162,3 +162,17 @@ AI-generated material is treated as a design and development aid. All proposals 
 - **How it was used:** Codex implemented the Testcontainers configuration in `PostgresTestConfiguration`, using a dedicated `postgres:17.11` container, an isolated `artseek_test` database, dynamically allocated ports, and Spring Boot `@ServiceConnection`. `IntegrationTest` imports that configuration once, while the specialized base classes inherit it and supply the appropriate JPA slice, full application context, transaction, or real HTTP-server configuration. Existing database-backed tests were migrated to the corresponding base class.
 - **Complementary tools and resources:** Spring Boot Testcontainers, PostgreSQL Testcontainers, Docker, JUnit 5, Spring Data JPA test support, and Maven were used. No external plugins, skills, MCP servers, or connectors are recorded for this use.
 - **Result and student review:** Integration and system tests now use isolated disposable PostgreSQL instances without connecting to the development database, while the shared base-class hierarchy keeps container and Spring test-scope configuration centralized and consistent.
+
+## AI-2026-11-04-001 — Aggregate-based backend architecture refactor
+
+- **Date:** 4 November 2026.
+- **Phase:** Backend architecture and structural enforcement.
+- **Objective:** Complete the aggregate-based package reorganization described in the task while preserving application behaviour, API contracts, persistence mappings, and existing test categories.
+- **Tool:** Claude.
+- **Specific version/model:** Claude Opus 5.5.
+- **Configuration:** `medium` reasoning level.
+- **Student design and direction:** The student defined how the refactor should be performed and the exact target architecture. This included organizing domain and infrastructure packages by aggregate, retaining cross-cutting infrastructure in shared top-level packages, preserving the application/CQRS organization, and specifying the dependency boundaries that the final architecture had to enforce. Claude was used to implement this student-defined design.
+- **How it was used:** Claude moved the Category and User domain types, repository ports, exceptions, persistence adapters, Spring Data repositories, controllers, and related tests into their aggregate-based packages; moved shared domain validation into `domain/shared`; and updated package declarations, imports, configuration, and references. It also updated the backend documentation and repository guidance/skills to match the new structure.
+- **Architecture tests:** Claude added the test-scoped ArchUnit dependency and implemented `HexagonalArchitectureUnitTests`. These tests enforce that the domain does not depend on application or infrastructure, application code does not depend on infrastructure, controllers dispatch through the Mediator instead of depending directly on handlers or repositories, and aggregate-specific infrastructure packages do not depend on one another. The checks run as Docker-independent unit tests.
+- **Complementary tools and resources:** ArchUnit, JUnit 5, Maven, Spring Boot, local file operations, and repository documentation were used.
+- **Result and student review:** The backend domain and infrastructure layers now follow an aggregate-based organization aligned with the existing application packages. Tests mirror the production structure, documentation describes the resulting architecture, and executable ArchUnit rules protect the student-defined boundaries against future regressions.
