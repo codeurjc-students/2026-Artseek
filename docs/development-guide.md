@@ -131,7 +131,7 @@ REST controller
           -> Spring Data JPA -> PostgreSQL
 ```
 
-- **Domain:** `Category`, the `CategoryType` enum, validation exceptions and the `CategoryRepository` port. Entities enforce their own invariants and use JPA annotations to avoid duplicating domain and persistence models.
+- **Domain:** `Category`, the `CategoryType` enum, `User` with its `Username`, `Email` and `PasswordHash` value objects and `Role` enum, validation exceptions and the `CategoryRepository` and `UserRepository` ports. Entities enforce their own invariants and use JPA annotations to avoid duplicating domain and persistence models.
 - **Application:** Query records, query handlers and DTOs, organized by feature. Handlers normalize and validate input through domain types, call repository ports and map results into immutable DTO lists. Read handlers use `@Transactional(readOnly = true)`.
 - **Infrastructure:** REST controllers, the Spring mediator implementation, JPA repository adapters, CORS configuration and local sample-data initialization.
 
@@ -177,6 +177,8 @@ The [generated HTML API reference](https://raw.githack.com/codeurjc-students/202
 | `GET /api/v1/categories/{type}` | Returns categories with `id`, `name` and `type`. Supported types are `painting` and `tattoo`; parsing ignores case and surrounding whitespace. A supported type with no categories returns `[]`. An unsupported type returns HTTP `400` with an empty body. Category order is not specified. |
 
 The generated YAML currently lists successful responses; the invalid-type `400` behavior is implemented in the controller and covered by its tests and the Postman examples. The health endpoint is an HTTP availability check, rather than a report of individual dependency status.
+
+The [security contract](security-contract.md) defines accounts, permissions, the planned authentication API, the JWT lifecycle, CSRF integration and the endpoint access matrix. User accounts are persisted through the `UserRepository` port and its JPA adapter; Spring Security is not enabled yet, so every endpoint above remains public.
 
 ## Quality control
 
