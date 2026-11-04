@@ -8,8 +8,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.artseek.application.category.CategoryDTO;
-import com.artseek.application.category.findbytype.FindCategoriesByTypeQuery;
-import com.artseek.application.category.findbytype.FindCategoriesByTypeQueryHandler;
 import com.artseek.domain.exceptions.category.InvalidCategoryTypeException;
 import com.artseek.domain.model.category.Category;
 import com.artseek.domain.model.category.CategoryType;
