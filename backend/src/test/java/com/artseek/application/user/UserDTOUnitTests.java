@@ -2,7 +2,7 @@ package com.artseek.application.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.artseek.domain.model.user.User;
+import com.artseek.domain.user.User;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;

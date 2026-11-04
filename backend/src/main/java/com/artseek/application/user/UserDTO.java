@@ -1,6 +1,6 @@
 package com.artseek.application.user;
 
-import com.artseek.domain.model.user.User;
+import com.artseek.domain.user.User;
 import java.time.Instant;
 
 /** Public account representation. Never carries the email address or credential data. */

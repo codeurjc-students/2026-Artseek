@@ -5,9 +5,9 @@ import java.util.List;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
-import com.artseek.domain.model.category.Category;
-import com.artseek.domain.model.category.CategoryType;
-import com.artseek.domain.repository.CategoryRepository;
+import com.artseek.domain.category.Category;
+import com.artseek.domain.category.CategoryType;
+import com.artseek.domain.category.repository.CategoryRepository;
 
 import jakarta.annotation.PostConstruct;
 

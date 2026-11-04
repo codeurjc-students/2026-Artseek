@@ -2,7 +2,7 @@ package com.artseek.application.category.categorytype.findusedtypes;
 
 import com.artseek.application.category.categorytype.CategoryTypeDTO;
 import com.artseek.application.mediator.QueryHandler;
-import com.artseek.domain.repository.CategoryRepository;
+import com.artseek.domain.category.repository.CategoryRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

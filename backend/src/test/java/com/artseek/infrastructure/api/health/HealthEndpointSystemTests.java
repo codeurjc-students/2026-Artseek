@@ -1,7 +1,8 @@
 package com.artseek.infrastructure.api.health;
 
-import com.artseek.common.SystemTest;
 import org.junit.jupiter.api.Test;
+
+import com.artseek.shared.SystemTest;
 
 class HealthEndpointSystemTests extends SystemTest {
 

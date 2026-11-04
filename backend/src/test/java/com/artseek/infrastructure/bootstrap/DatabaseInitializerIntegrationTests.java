@@ -2,9 +2,10 @@ package com.artseek.infrastructure.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.artseek.common.FullContextIntegrationTest;
-import com.artseek.domain.model.category.CategoryType;
-import com.artseek.domain.repository.CategoryRepository;
+import com.artseek.domain.category.CategoryType;
+import com.artseek.domain.category.repository.CategoryRepository;
+import com.artseek.shared.FullContextIntegrationTest;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
