@@ -1,13 +1,17 @@
 package com.artseek.domain.exceptions.category;
 
-public final class InvalidCategoryNameException extends RuntimeException {
+import com.artseek.domain.exceptions.DomainValidationException;
+
+public final class InvalidCategoryNameException extends DomainValidationException {
+
+    public static final String FIELD = "name";
 
     public static final String MESSAGE = "Category name must not be null or blank.";
 
     private final String invalidName;
 
     public InvalidCategoryNameException(String invalidName) {
-        super(MESSAGE);
+        super(FIELD, MESSAGE);
         this.invalidName = invalidName;
     }
 

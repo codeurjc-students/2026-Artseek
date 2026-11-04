@@ -1,5 +1,6 @@
 package com.artseek.domain.model.category;
 
+import com.artseek.domain.exceptions.DomainValidationException;
 import com.artseek.domain.exceptions.category.InvalidCategoryNameException;
 import com.artseek.domain.exceptions.category.InvalidCategoryTypeException;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,5 +51,17 @@ class CategoryUnitTests {
                 .hasMessage(InvalidCategoryTypeException.MESSAGE)
                 .extracting(exception -> ((InvalidCategoryTypeException) exception).getInvalidType())
                 .isEqualTo("unknown");
+    }
+
+    @Test
+    void reportsTheRejectedFieldThroughTheSharedValidationType() {
+        assertThatThrownBy(() -> new Category(" ", CategoryType.PAINTING))
+                .isInstanceOf(DomainValidationException.class)
+                .extracting(exception -> ((DomainValidationException) exception).getField())
+                .isEqualTo("name");
+        assertThatThrownBy(() -> CategoryType.fromValue("unknown"))
+                .isInstanceOf(DomainValidationException.class)
+                .extracting(exception -> ((DomainValidationException) exception).getField())
+                .isEqualTo("type");
     }
 }

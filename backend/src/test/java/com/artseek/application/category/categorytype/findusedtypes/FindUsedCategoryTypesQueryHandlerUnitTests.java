@@ -7,8 +7,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.artseek.application.category.categorytype.CategoryTypeDTO;
-import com.artseek.application.category.categorytype.findusedtypes.FindUsedCategoryTypesQuery;
-import com.artseek.application.category.categorytype.findusedtypes.FindUsedCategoryTypesQueryHandler;
 import com.artseek.domain.model.category.CategoryType;
 import com.artseek.domain.repository.CategoryRepository;
 import java.util.ArrayList;
