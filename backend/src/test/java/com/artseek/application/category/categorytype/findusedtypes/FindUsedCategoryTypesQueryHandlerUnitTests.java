@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.artseek.application.category.categorytype.CategoryTypeDTO;
-import com.artseek.domain.model.category.CategoryType;
-import com.artseek.domain.repository.CategoryRepository;
+import com.artseek.domain.category.CategoryType;
+import com.artseek.domain.category.repository.CategoryRepository;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;

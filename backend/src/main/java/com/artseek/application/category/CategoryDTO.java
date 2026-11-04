@@ -1,6 +1,6 @@
 package com.artseek.application.category;
 
-import com.artseek.domain.model.category.Category;
+import com.artseek.domain.category.Category;
 
 public record CategoryDTO(Long id, String name, String type) {
 
