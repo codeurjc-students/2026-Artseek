@@ -32,7 +32,7 @@ Status legend: **Implemented** exists in the code; **Planned** is binding for th
 
 The `User` factories take primitive values and always build the `Username`, `Email` and `PasswordHash` value objects themselves, so every value object validates its input and no field can be left unset. Normalization happens when those value objects are built. Lookups and persisted values therefore always use the same form, and the plain database unique constraints are case-insensitive in practice. Two registrations that differ only in case or surrounding whitespace collide.
 
-Validation failures raise domain exceptions under `domain/exceptions/user/`. Every domain validation exception, including the existing category ones, extends `domain/exceptions/DomainValidationException`, which exposes the rejected `field` and a fixed message. `InvalidPasswordHashException` deliberately does not keep the rejected value, because it could be a plaintext password passed by mistake.
+Validation failures raise domain exceptions under `domain/user/exceptions/`. Every domain validation exception, including the existing category ones, extends `domain/shared/DomainValidationException`, which exposes the rejected `field` and a fixed message. `InvalidPasswordHashException` deliberately does not keep the rejected value, because it could be a plaintext password passed by mistake.
 
 The public representation is `UserDTO(id, username, role, createdAt)`. `role` is the public value (`"user"` or `"admin"`). `User.toString()` includes only the id, username and role, and `PasswordHash.toString()` prints `PasswordHash[PROTECTED]`.
 

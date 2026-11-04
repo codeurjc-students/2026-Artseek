@@ -25,6 +25,8 @@ Controller
 
 Code in the domain or application layers must never import controllers, repository adapters, or Spring Data repositories. Controllers must not inject repositories directly.
 
+`src/test/java/com/artseek/HexagonalArchitectureUnitTests` enforces these boundaries with ArchUnit: the domain imports nothing from application, infrastructure, Spring web or Spring Data; the application imports nothing from infrastructure; controllers do not depend on handlers or repositories; and one aggregate's infrastructure does not depend on another aggregate's infrastructure.
+
 ## Directory and Package Architecture
 
 Use the following structure:
@@ -32,9 +34,10 @@ Use the following structure:
 ```text
 src/main/java/com/artseek/
   domain/
-    model/<entity>/                 Entities, value objects, and enums
-    exceptions/<entity>/            Entity-related domain exceptions
-    repository/                     Repository interfaces (outbound ports)
+    shared/                         Cross-aggregate domain types (DomainValidationException)
+    <aggregate>/                    Entities, value objects, and enums
+      exceptions/                   Aggregate-related domain exceptions
+      repository/                   Repository interfaces (outbound ports)
 
   application/
     usecase/<domain-area>/
@@ -44,11 +47,17 @@ src/main/java/com/artseek/
         <Feature>Service.java       Use-case implementation
 
   infrastructure/
-    api/                            REST controllers and HTTP concerns
+    <aggregate>/
+      api/                          REST controllers for the aggregate
+      repository/                   Persistence adapters and Spring Data repositories
+      exceptions/                   Only when an infrastructure exception exists
+    api/                            Cross-cutting HTTP concerns (health/)
     bootstrap/                      Application startup and sample-data initialization
     config/                         Spring/framework configuration
-    repository/<entity>/            Persistence adapters and Spring Data repositories
+    mediator/                       SpringMediator and registration errors
 ```
+
+Domain and infrastructure code are organized by aggregate (currently `category` and `user`). Cross-cutting infrastructure (`config/`, `mediator/`, `bootstrap/`, top-level `api/`, and the future `security/` and `config/security/`) stays at the top level of `infrastructure/`.
 
 Organize application code by feature/vertical slice. For example:
 
@@ -95,7 +104,7 @@ Use Java enums when the domain defines a closed set of values. `CategoryType` is
 
 ### Domain exceptions
 
-Use entity-specific exceptions under `domain/exceptions/<entity>/` instead of leaking generic `NullPointerException` or `IllegalArgumentException` for domain validation failures.
+Use aggregate-specific exceptions under `domain/<aggregate>/exceptions/`, extending `domain/shared/DomainValidationException`, instead of leaking generic `NullPointerException` or `IllegalArgumentException` for domain validation failures.
 
 Domain exceptions should:
 
@@ -108,9 +117,9 @@ Examples are `InvalidCategoryNameException` and `InvalidCategoryTypeException`.
 
 ## Repository Ports and Persistence Adapters
 
-Repository interfaces belong in `domain/repository` and use domain types. They are outbound ports describing what the core needs, not how data is stored.
+Repository interfaces belong in `domain/<aggregate>/repository` and use domain types. They are outbound ports describing what the core needs, not how data is stored.
 
-Persistence implementations belong in `infrastructure/repository/<entity>/`:
+Persistence implementations belong in `infrastructure/<aggregate>/repository/`:
 
 ```text
 CategoryRepository                  Domain port
@@ -206,7 +215,7 @@ Current `CategoryDTO` contains `Long id`, `String name`, and `String type`. `Cat
 
 ## Infrastructure/API Layer
 
-Controllers belong in `infrastructure/api` because they adapt HTTP requests/responses to application use cases and depend heavily on Spring MVC.
+Aggregate controllers belong in `infrastructure/<aggregate>/api` (cross-cutting HTTP such as health stays in `infrastructure/api`) because they adapt HTTP requests/responses to application use cases and depend heavily on Spring MVC.
 
 Controller rules:
 
@@ -238,7 +247,7 @@ Keep separate `<Class>UnitTests` and `<Class>IntegrationTests` classes in matchi
 
 System tests use the suffix `SystemTests` and mirror their controller's production package under `src/test/java`, alongside its other tests. For example, `HealthEndpointSystemTests` belongs in `com/artseek/infrastructure/api/health`, matching `HealthController` under `src/main/java`.
 
-Shared abstract bases live under `src/test/java/com/artseek/common`:
+Shared abstract bases live under `src/test/java/com/artseek/shared`:
 
 - `IntegrationTest` imports `PostgresTestConfiguration` only. It does not declare `@SpringBootTest`, `@DataJpaTest` or `@Transactional`.
 - `JpaIntegrationTest extends IntegrationTest` declares `@DataJpaTest` and `@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)`. It provides a focused persistence slice with automatic rollback after each test.
@@ -268,7 +277,7 @@ Choose scope by the collaboration being verified. `JpaIntegrationTest` loads per
 - Handler unit tests cover query/command type registration, DTO mapping, empty results, validation, rejected-input exception data, and absence of repository calls for invalid input. Verify immutable snapshots where that is part of the output contract.
 - Handler integration tests verify persistence-backed behavior: generated IDs in DTOs, filtering, distinct/order semantics, and exclusion of supported-but-unused types. Controller tests verify routing, JSON, delegation, and semantic HTTP errors.
 - Use controlled test databases and explicit fixtures, never the development/production database. Exact result assertions are appropriate; do not assume generated IDs or unspecified ordering.
-- Keep container declarations exclusively in `src/test/java/com/artseek/infrastructure/config/PostgresTestConfiguration`. The `common.IntegrationTest` base imports this configuration; concrete database tests inherit it through `JpaIntegrationTest`, `FullContextIntegrationTest` or `SystemTest`, as specified above. Plain unit and controller web-slice tests must not extend any of these bases. Use test-scoped `spring-boot-testcontainers` and `testcontainers-postgresql` dependencies managed by Spring Boot.
+- Keep container declarations exclusively in `src/test/java/com/artseek/infrastructure/config/PostgresTestConfiguration`. The `shared.IntegrationTest` base imports this configuration; concrete database tests inherit it through `JpaIntegrationTest`, `FullContextIntegrationTest` or `SystemTest`, as specified above. Plain unit and controller web-slice tests must not extend any of these bases. Use test-scoped `spring-boot-testcontainers` and `testcontainers-postgresql` dependencies managed by Spring Boot.
 - Use the pinned `postgres:17.11` image, matching the development PostgreSQL 17 engine and inspected local image version, with a separate `artseek_test` database and dynamically allocated host ports. `@ServiceConnection` supplies connection details automatically. Do not connect tests to the development database, bind port 5432, mount its volume or fall back to an embedded database.
 - Every JPA slice must extend `JpaIntegrationTest` to inherit `@DataJpaTest` and disabled datasource replacement, and retain its focused handler/adapter imports. Full-context/controller/system tests inherit the container configuration through their appropriate base while retaining real application wiring.
 - Let Spring manage the container bean lifecycle: one container per cached context, shared by compatible tests, stopped only after its dependent JPA/datasource beans are destroyed. Do not use JUnit `@Container` lifecycle management, per-method containers or persistent container reuse. Different context configurations receive separate databases, avoiding shared `create-drop` schema interference.

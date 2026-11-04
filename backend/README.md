@@ -27,6 +27,24 @@ The API is available at `http://localhost:8080`. Verify it with `GET /api/health
 Database settings can be changed with `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and
 `JPA_DDL_AUTO`. Change the permitted browser origin with `FRONTEND_ORIGIN`.
 
+## Package layout
+
+Production code under `src/main/java/com/artseek` is organized by layer and then by
+aggregate, and tests mirror the production packages:
+
+```text
+domain/          shared/, category/, user/ (each with exceptions/ and repository/)
+application/     mediator/, category/, user/ (queries, handlers and DTOs by feature)
+infrastructure/  category/ (api/, repository/), user/ (repository/),
+                 api/health/, config/, mediator/, bootstrap/ (cross-cutting)
+```
+
+`HexagonalArchitectureUnitTests` enforces the dependency rules with ArchUnit: the
+domain does not depend on application, infrastructure, Spring web or Spring Data;
+the application does not depend on infrastructure; controllers do not depend on
+handlers or repositories; and aggregates' infrastructure packages do not depend
+on each other.
+
 ## Tests and coverage
 
 Run the complete unit, integration, and HTTP system test suite with:
@@ -43,7 +61,7 @@ before running database tests. The first run downloads the image. When Docker is
 unavailable, database tests fail rather than being skipped or using an embedded
 database.
 
-All shared test base classes live under `src/test/java/com/artseek/common`:
+All shared test base classes live under `src/test/java/com/artseek/shared`:
 
 | Base class | Inherited configuration |
 | --- | --- |

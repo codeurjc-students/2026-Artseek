@@ -9,7 +9,7 @@ Use this skill for backend implementation, refactoring, bug fixes, and architect
 
 Artseek uses **DDD Lite + CQRS Lite + hexagonal architecture**. Domain entities deliberately carry JPA annotations, and application handlers deliberately use Spring service/transaction annotations to avoid duplicate models and transaction-decorator boilerplate.
 
-The user confirmed the existing mediator and handlers as the intended architecture. This replaces the older explicit `<Feature>UseCase` / `<Feature>Service` and `application/usecase/` rules still present in `backend/AGENTS.md`. That file is being retained unchanged at the user's request; do not restore the former structure because of that older wording.
+The user confirmed the existing mediator and handlers as the intended architecture. This replaces the older explicit `<Feature>UseCase` / `<Feature>Service` and `application/usecase/` rules still present in `backend/AGENTS.md`. Its domain and infrastructure package layout follows the per-aggregate structure below, but its application `UseCase`/`Service` wording is retained at the user's request; do not restore the former structure because of that older wording.
 
 Paths below are relative to `backend/` unless stated otherwise.
 
@@ -34,18 +34,21 @@ REST controller
 - Controllers performing application operations inject the application `Mediator` interface, not `SpringMediator`, individual handlers, repositories, or concrete application services.
 - Use constructor injection and `final` fields for production dependencies. A single constructor does not need `@Autowired`; the annotation itself is not forbidden.
 
+`src/test/java/com/artseek/HexagonalArchitectureUnitTests` enforces these boundaries with ArchUnit: the domain imports nothing from application, infrastructure, Spring web or Spring Data; the application imports nothing from infrastructure; controllers do not depend on handlers or repositories; and one aggregate's infrastructure does not depend on another aggregate's infrastructure. Keep it passing. Change a rule only when the user confirms an architectural change.
+
 ## Directory and package layout
 
 ```text
 src/main/java/com/artseek/
   domain/
-    model/<entity>/                     Entities, value objects, enums
-    exceptions/<entity>/                Entity-specific domain exceptions
-    repository/                         Repository interfaces: outbound ports
+    shared/                             Cross-aggregate domain types (DomainValidationException)
+    <aggregate>/                        Entities, value objects, enums
+      exceptions/                       Aggregate-specific domain exceptions
+      repository/                       Repository interfaces: outbound ports
 
   application/
     mediator/                           Command, Query, handler and bus contracts
-    <domain-area>/
+    <aggregate>/
       <SharedDTO>.java                  Reusable application output DTO
       <feature>/
         <Feature>Query.java             Query request record
@@ -53,14 +56,19 @@ src/main/java/com/artseek/
         # or <Feature>Command.java and <Feature>CommandHandler.java for writes
 
   infrastructure/
-    api/                                REST controllers and HTTP concerns
+    <aggregate>/
+      api/                              REST controllers for the aggregate
+      repository/                       Persistence adapters and Spring Data
+      exceptions/                       Only when an infrastructure exception exists
+    api/                                Cross-cutting HTTP: health/, shared error DTOs and advice
     bootstrap/                          Startup/sample-data initialization
     config/                             Spring/framework configuration
     mediator/                           SpringMediator and registration errors
-    repository/<entity>/                Persistence adapters and Spring Data
 ```
 
-Organize application code by domain area and feature/vertical slice. Put a request and its handler in the same feature package. Nest related concepts within the domain area when needed, and put shared DTOs at the nearest common application package. Current examples:
+All three layers are organized by aggregate (currently `category` and `user`), so a concept's domain, application and infrastructure code share the same package name. Cross-cutting infrastructure such as `config/`, `mediator/`, `bootstrap/`, top-level `api/` and the future `security/` and `config/security/` stays at the top level of `infrastructure/`. Split an aggregate's `api/` into `controller/` and `requests/` only when it grows. Create `infrastructure/<aggregate>/exceptions/` only for an actual infrastructure exception.
+
+Organize application code by aggregate and feature/vertical slice. Put a request and its handler in the same feature package. Nest related concepts within the domain area when needed, and put shared DTOs at the nearest common application package. Current examples:
 
 ```text
 application/category/
@@ -90,7 +98,7 @@ Domain entities may use Jakarta persistence annotations such as `@Entity`, `@Id`
 - Use Java enums for confirmed closed business vocabularies. Each constant owns a stable lowercase public string, such as `CategoryType.PAINTING.value()` returning `"painting"`.
 - Parse external strings through domain methods such as `CategoryType.fromValue`, retaining the domain's established validation and normalization behavior. Do not invent new enum values.
 - Persist enums with `@Enumerated(EnumType.STRING)`, never ordinal values. The stored enum name and its public string value serve different boundaries.
-- Put entity-specific validation exceptions in `domain/exceptions/<entity>/`. Do not expose generic `NullPointerException` or `IllegalArgumentException` as domain validation failures.
+- Put aggregate-specific validation exceptions in `domain/<aggregate>/exceptions/`, extending `domain/shared/DomainValidationException`. Do not expose generic `NullPointerException` or `IllegalArgumentException` as domain validation failures.
 - Give exceptions a stable fixed message, exposed as `MESSAGE` when appropriate, and structured rejected-input data with an accessor. HTTP translation belongs at the API boundary.
 
 ## CQRS Lite requests and handlers
@@ -135,14 +143,14 @@ The matching handler implements `QueryHandler<FindCategoriesByTypeQuery, List<Ca
 
 ## Repository ports and persistence adapters
 
-Repository interfaces in `domain/repository/` use domain types and express what the core needs. They are outbound ports, not Spring Data interfaces. Handlers depend on those ports only.
+Repository interfaces in `domain/<aggregate>/repository/` use domain types and express what the core needs. They are outbound ports, not Spring Data interfaces. Handlers depend on those ports only.
 
 For each persisted entity, use:
 
 ```text
-<Entity>Repository                 domain/repository/: domain port
-<Entity>RepositoryAdapter          infrastructure/repository/<entity>/: @Repository
-SpringData<Entity>Repository       infrastructure/repository/<entity>/: Spring Data JPA
+<Entity>Repository                 domain/<aggregate>/repository/: domain port
+<Entity>RepositoryAdapter          infrastructure/<aggregate>/repository/: @Repository
+SpringData<Entity>Repository       infrastructure/<aggregate>/repository/: Spring Data JPA
 ```
 
 The adapter implements the domain port and delegates to Spring Data through constructor injection. A technology-specific name such as `Jpa<Entity>RepositoryAdapter` is needed only when multiple persistence technologies make the ordinary name ambiguous. Do not import adapters or Spring Data repositories into application code.
@@ -165,7 +173,7 @@ Examples are `application/category/CategoryDTO(Long id, String name, String type
 
 ## REST API adapters
 
-Controllers belong in `infrastructure/api/` and adapt HTTP inputs and outputs. Keep business decisions in the domain and orchestration in handlers.
+Aggregate controllers belong in `infrastructure/<aggregate>/api/`, such as `infrastructure/category/api/CategoryRestController`; cross-cutting HTTP such as `infrastructure/api/health/HealthController` stays in `infrastructure/api/`. Controllers adapt HTTP inputs and outputs. Keep business decisions in the domain and orchestration in handlers.
 
 - Inject the application `Mediator` interface for business operations and construct the corresponding query or command. Do not access repositories or concrete handlers/services directly.
 - Return application DTOs for result-bearing operations. Always use `ResponseEntity` to make HTTP status and headers explicit, including operations with no response body.

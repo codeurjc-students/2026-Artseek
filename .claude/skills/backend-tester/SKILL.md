@@ -7,7 +7,7 @@ description: Create, fix, or review Artseek backend tests for domain behavior, C
 
 Use this skill when creating, fixing, or reviewing tests under `backend/`. Apply the same conventions to future features; category and health tests are examples, not limits on the skill's scope. Preserve the existing test architecture unless the user changes it. Ask when the expected business behavior or required coverage is unclear rather than inventing it.
 
-Paths below are relative to `backend/` unless stated otherwise. Production Java lives under `src/main/java/com/artseek`; tests mirror the subject's package under `src/test/java/com/artseek`.
+Paths below are relative to `backend/` unless stated otherwise. Production Java lives under `src/main/java/com/artseek`, organized by layer and then aggregate (for example `domain/category/`, `infrastructure/user/repository/`); tests mirror the subject's package under `src/test/java/com/artseek`.
 
 ## Choose the test scope
 
@@ -25,13 +25,14 @@ Inspect the production behavior, existing tests, and shared bases before changin
 | Domain persistence integration tests, when persistence behavior needs verification | `JpaIntegrationTest` | Focused persistence setup/imports for the mapping under test. | Persistence-specific behavior that plain domain tests cannot verify. |
 | Controller integration tests | `FullContextIntegrationTest` | **Required:** `@AutoConfigureMockMvc`; real mediator, handlers, adapters, and persistence. | Routing, validation, serialization, errors, and the real controller-to-database path. |
 | Application/bootstrap integration tests | `FullContextIntegrationTest` | Inject collaborators and declare the class's own JUnit tests. | Real application wiring and initializer behavior, including read-only context tests. |
+| Architecture rules (`HexagonalArchitectureUnitTests`) | None | ArchUnit `@AnalyzeClasses(packages = "com.artseek")` with `@ArchTest` rules over production classes. | Layer dependency direction, controller dependencies, and isolation between aggregates' infrastructure. |
 | HTTP system tests | `SystemTest` | Use inherited `restTestClient`; set up and clean up committed fixtures when needed. | Actual HTTP transport through a running server. |
 
 Controllers require both focused web-slice tests and real integration coverage. Use system tests when real HTTP transport is the collaboration being verified. Add domain persistence tests only when persistence behavior needs checking; domain business rules stay in plain unit tests.
 
 ## Shared bases and inherited annotations
 
-The abstract bases are in `src/test/java/com/artseek/common`:
+The abstract bases are in `src/test/java/com/artseek/shared`:
 
 | Base | Configuration it owns |
 | --- | --- |
