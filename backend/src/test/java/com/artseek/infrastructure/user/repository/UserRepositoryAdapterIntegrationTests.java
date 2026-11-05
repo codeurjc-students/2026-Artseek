@@ -47,6 +47,7 @@ class UserRepositoryAdapterIntegrationTests extends JdbcIntegrationTest {
                 .isPresent()
                 .get()
                 .satisfies(user -> {
+                    assertThat(user.getId()).isEqualTo(savedUser.getId());
                     assertThat(user.getUsername()).isEqualTo(new Username("ada"));
                     assertThat(user.getEmail()).isEqualTo(new Email("ada@example.org"));
                     assertThat(user.getPasswordHash()).isEqualTo(new PasswordHash(PASSWORD_HASH));

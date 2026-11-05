@@ -1,6 +1,7 @@
 package com.artseek.infrastructure.category.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.artseek.domain.category.Category;
 import com.artseek.domain.category.CategoryType;
@@ -12,6 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Import(CategoryRepositoryAdapter.class)
@@ -51,9 +53,44 @@ class CategoryRepositoryAdapterIntegrationTests extends JdbcIntegrationTest {
                 .isPresent()
                 .get()
                 .satisfies(category -> {
+                    assertThat(category.getId()).isEqualTo(savedCategory.getId());
                     assertThat(category.getName()).isEqualTo("Surrealism");
                     assertThat(category.getType()).isEqualTo(CategoryType.PAINTING);
                 });
+    }
+
+    @Test
+    void savesARenamedCategory() {
+        Category category = categoryRepository.save(new Category("Surealism", CategoryType.PAINTING));
+
+        category.rename("Surrealism");
+        categoryRepository.save(category);
+
+        assertThat(categoryRepository.findByType(CategoryType.PAINTING))
+                .singleElement()
+                .satisfies(renamed -> {
+                    assertThat(renamed.getId()).isEqualTo(category.getId());
+                    assertThat(renamed.getName()).isEqualTo("Surrealism");
+                });
+    }
+
+    @Test
+    void rejectsADuplicateNameWithinTheSameType() {
+        categoryRepository.save(new Category("Watercolor", CategoryType.PAINTING));
+
+        assertThatThrownBy(() -> categoryRepository.save(new Category("Watercolor", CategoryType.PAINTING)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining(CategoryPersistenceModel.NAME_TYPE_CONSTRAINT);
+    }
+
+    @Test
+    void allowsTheSameNameForDifferentTypes() {
+        categoryRepository.save(new Category("Watercolor", CategoryType.PAINTING));
+
+        categoryRepository.save(new Category("Watercolor", CategoryType.TATTOO));
+
+        assertThat(categoryRepository.existsByNameAndType("Watercolor", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Watercolor", CategoryType.TATTOO)).isTrue();
     }
 
     @Test
