@@ -65,19 +65,14 @@ class CategoryRepositoryAdapterUnitTests {
     }
 
     @Test
-    void delegatesFindByNameAndTypeToSpringDataRepository() {
-        Category category = new Category("Surrealism", CategoryType.PAINTING);
-        Optional<Category> expectedCategory = Optional.of(category);
-        when(springDataCategoryRepository.findByNameAndType(
-                "Surrealism", CategoryType.PAINTING))
-                .thenReturn(expectedCategory);
+    void delegatesExistsByNameAndTypeToSpringDataRepository() {
+        when(springDataCategoryRepository.existsByNameAndType("Surrealism", CategoryType.PAINTING))
+                .thenReturn(true);
 
-        Optional<Category> result = categoryRepositoryAdapter.findByNameAndType(
-                "Surrealism", CategoryType.PAINTING);
+        boolean result = categoryRepositoryAdapter.existsByNameAndType("Surrealism", CategoryType.PAINTING);
 
-        assertThat(result).isSameAs(expectedCategory);
-        verify(springDataCategoryRepository).findByNameAndType(
-                "Surrealism", CategoryType.PAINTING);
+        assertThat(result).isTrue();
+        verify(springDataCategoryRepository).existsByNameAndType("Surrealism", CategoryType.PAINTING);
         verifyNoMoreInteractions(springDataCategoryRepository);
     }
 
@@ -98,9 +93,11 @@ class CategoryRepositoryAdapterUnitTests {
         List<Category> categories = List.of(
                 new Category("Surrealism", CategoryType.PAINTING),
                 new Category("Blackwork", CategoryType.TATTOO));
+        when(springDataCategoryRepository.saveAll(categories)).thenReturn(categories);
 
-        categoryRepositoryAdapter.saveAll(categories);
+        List<Category> result = categoryRepositoryAdapter.saveAll(categories);
 
+        assertThat(result).isSameAs(categories);
         verify(springDataCategoryRepository).saveAll(categories);
         verifyNoMoreInteractions(springDataCategoryRepository);
     }

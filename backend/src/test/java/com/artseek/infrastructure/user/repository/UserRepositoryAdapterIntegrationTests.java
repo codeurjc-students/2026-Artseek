@@ -11,7 +11,6 @@ import com.artseek.domain.user.Username;
 import com.artseek.domain.user.repository.UserRepository;
 import com.artseek.shared.JpaIntegrationTest;
 
-import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,12 +37,10 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void savesAUserAndAssignsItsIdentifierAndTimestamps() {
+    void savesAUserAndAssignsItsIdentifier() {
         User savedUser = userRepository.save(newUser("ada", "ada@example.org"));
 
         assertThat(savedUser.getId()).isNotNull().isPositive();
-        assertThat(savedUser.getCreatedAt()).isNotNull();
-        assertThat(savedUser.getUpdatedAt()).isEqualTo(savedUser.getCreatedAt());
     }
 
     @Test
@@ -60,8 +57,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
                     assertThat(user.getEmail()).isEqualTo(new Email("ada@example.org"));
                     assertThat(user.getPasswordHash()).isEqualTo(new PasswordHash(PASSWORD_HASH));
                     assertThat(user.getRole()).isEqualTo(Role.USER);
-                    assertThat(user.getCreatedAt()).isEqualTo(savedUser.getCreatedAt());
-                    assertThat(user.getUpdatedAt()).isEqualTo(savedUser.getUpdatedAt());
                 });
     }
 
@@ -112,7 +107,7 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void persistsAnAdministratorRoleByName() {
         User savedAdministrator = userRepository.save(User.createAdministrator(
-                "grace", "grace@example.org", PASSWORD_HASH));
+                new Username("grace"), new Email("grace@example.org"), new PasswordHash(PASSWORD_HASH)));
         entityManager.flush();
 
         assertThat(jdbcTemplate.queryForObject(
@@ -147,22 +142,19 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     }
 
     @Test
-    void refreshesOnlyTheUpdateTimestampWhenAUserChanges() {
+    void persistsAChangedPasswordHash() {
         User savedUser = userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
-        Instant createdAt = savedUser.getCreatedAt();
 
-        savedUser.changePasswordHash(OTHER_PASSWORD_HASH);
+        savedUser.changePasswordHash(new PasswordHash(OTHER_PASSWORD_HASH));
+        User updatedUser = userRepository.save(savedUser);
         entityManager.flush();
         entityManager.clear();
 
-        User reloadedUser = userRepository.findById(savedUser.getId()).orElseThrow();
+        User reloadedUser = userRepository.findById(updatedUser.getId()).orElseThrow();
         assertThat(reloadedUser.getPasswordHash()).isEqualTo(new PasswordHash(OTHER_PASSWORD_HASH));
-        assertThat(reloadedUser.getCreatedAt()).isEqualTo(createdAt);
-        assertThat(reloadedUser.getUpdatedAt()).isAfterOrEqualTo(createdAt);
     }
 
     private static User newUser(String username, String email) {
-        return User.register(username, email, PASSWORD_HASH);
+        return User.register(new Username(username), new Email(email), new PasswordHash(PASSWORD_HASH));
     }
 }

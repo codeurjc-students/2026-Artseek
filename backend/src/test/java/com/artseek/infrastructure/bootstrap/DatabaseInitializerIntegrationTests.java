@@ -8,11 +8,15 @@ import com.artseek.shared.FullContextIntegrationTest;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class DatabaseInitializerIntegrationTests extends FullContextIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void initializesTheExpectedSampleCategories() {
@@ -20,10 +24,21 @@ class DatabaseInitializerIntegrationTests extends FullContextIntegrationTest {
 
         databaseInitializer.init();
 
-        assertThat(categoryRepository.findByNameAndType("Surrealism", CategoryType.PAINTING)).isPresent();
-        assertThat(categoryRepository.findByNameAndType("Impressionism", CategoryType.PAINTING)).isPresent();
-        assertThat(categoryRepository.findByNameAndType("Realism", CategoryType.PAINTING)).isPresent();
-        assertThat(categoryRepository.findByNameAndType("Blackwork", CategoryType.TATTOO)).isPresent();
-        assertThat(categoryRepository.findByNameAndType("Watercolor", CategoryType.TATTOO)).isPresent();
+        assertThat(categoryRepository.existsByNameAndType("Surrealism", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Impressionism", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Realism", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Blackwork", CategoryType.TATTOO)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Watercolor", CategoryType.TATTOO)).isTrue();
+    }
+
+    @Test
+    void doesNotDuplicateSampleCategoriesWhenRunAgain() {
+        DatabaseInitializer databaseInitializer = new DatabaseInitializer(categoryRepository);
+
+        databaseInitializer.init();
+        databaseInitializer.init();
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from categories", Integer.class))
+                .isEqualTo(5);
     }
 }

@@ -7,6 +7,8 @@ import com.artseek.domain.category.CategoryType;
 import com.artseek.domain.category.repository.CategoryRepository;
 import com.artseek.shared.JpaIntegrationTest;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -89,21 +91,26 @@ class CategoryRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     }
 
     @Test
-    void findsACategoryByNameAndType() {
+    void reportsWhetherACategoryExistsByNameAndType() {
         categoryRepository.save(new Category("Surrealism", CategoryType.PAINTING));
 
-        assertThat(categoryRepository.findByNameAndType("Surrealism", CategoryType.PAINTING))
-                .isPresent()
-                .get()
-                .extracting(Category::getName)
-                .isEqualTo("Surrealism");
+        assertThat(categoryRepository.existsByNameAndType("Surrealism", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Cubism", CategoryType.PAINTING)).isFalse();
+        assertThat(categoryRepository.existsByNameAndType("Surrealism", CategoryType.TATTOO)).isFalse();
     }
 
     @Test
-    void returnsEmptyWhenNameAndTypeDoNotMatch() {
-        categoryRepository.save(new Category("Surrealism", CategoryType.PAINTING));
+    void savesAllCategoriesAndReturnsThemWithIdentifiers() {
+        List<Category> savedCategories = categoryRepository.saveAll(List.of(
+                new Category("Surrealism", CategoryType.PAINTING),
+                new Category("Blackwork", CategoryType.TATTOO)));
 
-        assertThat(categoryRepository.findByNameAndType("Cubism", CategoryType.PAINTING))
-                .isEmpty();
+        assertThat(savedCategories)
+                .extracting(Category::getId)
+                .doesNotContainNull()
+                .doesNotHaveDuplicates();
+        assertThat(savedCategories)
+                .extracting(Category::getName)
+                .containsExactly("Surrealism", "Blackwork");
     }
 }

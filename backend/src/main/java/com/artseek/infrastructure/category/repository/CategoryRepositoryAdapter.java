@@ -34,8 +34,8 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
-    public Optional<Category> findByNameAndType(String name, CategoryType type) {
-        return springCategoryRepository.findByNameAndType(name, type);
+    public boolean existsByNameAndType(String name, CategoryType type) {
+        return springCategoryRepository.existsByNameAndType(name, type);
     }
 
     @Override
@@ -44,7 +44,7 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
-    public void saveAll(List<Category> categories) {
-        springCategoryRepository.saveAll(categories);
+    public List<Category> saveAll(List<Category> categories) {
+        return springCategoryRepository.saveAll(categories);
     }
 }

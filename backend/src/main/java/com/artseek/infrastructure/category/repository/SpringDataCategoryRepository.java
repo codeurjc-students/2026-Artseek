@@ -1,7 +1,6 @@
 package com.artseek.infrastructure.category.repository;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,5 +15,5 @@ public interface SpringDataCategoryRepository extends JpaRepository<Category, Lo
     @Query("select distinct category.type from Category category order by category.type")
     List<CategoryType> findUsedTypes();
 
-    Optional<Category> findByNameAndType(String name, CategoryType type);
+    boolean existsByNameAndType(String name, CategoryType type);
 }

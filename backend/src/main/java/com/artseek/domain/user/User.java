@@ -1,5 +1,6 @@
 package com.artseek.domain.user;
 
+import com.artseek.domain.user.exceptions.InvalidRoleException;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -11,10 +12,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.SourceType;
-import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * A registered account. Ordinary registration always grants {@link Role#USER}; administrators
@@ -53,33 +50,34 @@ public class User {
     @Column(nullable = false, length = 20)
     private Role role;
 
-    @CreationTimestamp(source = SourceType.DB)
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @UpdateTimestamp(source = SourceType.DB)
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
     /** Required by JPA. Domain code should use the factories. */
     protected User() {
     }
 
-    private User(String username, String email, String passwordHash, Role role) {
-        this.username = new Username(username);
-        this.email = new Email(email);
-        this.passwordHash = new PasswordHash(passwordHash);
-        this.role = role;
+    private User(Long id, Username username, Email email, PasswordHash passwordHash, Role role) {
+        this.id = id;
+        this.username = username;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.role = validateRole(role);
     }
 
     /** Creates an ordinary account. Registration can never grant elevated permissions. */
-    public static User register(String username, String email, String passwordHash) {
-        return new User(username, email, passwordHash, Role.USER);
+    public static User register(Username username, Email email, PasswordHash passwordHash) {
+        return new User(null, username, email, passwordHash, Role.USER);
     }
 
     /** Creates an administrator. Only trusted, non-public paths may call this factory. */
-    public static User createAdministrator(String username, String email, String passwordHash) {
-        return new User(username, email, passwordHash, Role.ADMIN);
+    public static User createAdministrator(Username username, Email email, PasswordHash passwordHash) {
+        return new User(null, username, email, passwordHash, Role.ADMIN);
+    }
+
+    /**
+     * Rebuilds an existing account from persisted values. The value objects validate their
+     * input again, so stored data that breaks a current rule fails before reaching this factory.
+     */
+    public static User restore(Long id, Username username, Email email, PasswordHash passwordHash, Role role) {
+        return new User(id, username, email, passwordHash, role);
     }
 
     public Long getId() {
@@ -106,22 +104,21 @@ public class User {
         return role == Role.ADMIN;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
     /** Replaces the stored hash, for example after a password change or a cost-parameter rehash. */
-    public void changePasswordHash(String passwordHash) {
-        this.passwordHash = new PasswordHash(passwordHash);
+    public void changePasswordHash(PasswordHash passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     @Override
     public String toString() {
         return "User[id=" + id + ", username=" + (username == null ? null : username.value())
                 + ", role=" + role + "]";
+    }
+
+    private static Role validateRole(Role role) {
+        if (role == null) {
+            throw new InvalidRoleException(null);
+        }
+        return role;
     }
 }

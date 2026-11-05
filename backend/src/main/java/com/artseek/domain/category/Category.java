@@ -31,9 +31,23 @@ public class Category {
     protected Category() {
     }
 
+    /** Creates a new category. Its identifier stays null until it is first saved. */
     public Category(String name, CategoryType type) {
+        this(null, name, type);
+    }
+
+    private Category(Long id, String name, CategoryType type) {
+        this.id = id;
         this.name = validateName(name);
         this.type = validateType(type);
+    }
+
+    /**
+     * Rebuilds an existing category from persisted values. Validation runs again, so stored
+     * data that breaks a current rule fails here instead of entering the domain.
+     */
+    public static Category restore(Long id, String name, CategoryType type) {
+        return new Category(id, name, type);
     }
 
     public Long getId() {

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.artseek.domain.user.Email;
+import com.artseek.domain.user.PasswordHash;
 import com.artseek.domain.user.User;
 import com.artseek.domain.user.Username;
 import java.util.Optional;
@@ -96,6 +97,6 @@ class UserRepositoryAdapterUnitTests {
     }
 
     private static User newUser() {
-        return User.register("ada", "ada@example.org", PASSWORD_HASH);
+        return User.register(new Username("ada"), new Email("ada@example.org"), new PasswordHash(PASSWORD_HASH));
     }
 }
