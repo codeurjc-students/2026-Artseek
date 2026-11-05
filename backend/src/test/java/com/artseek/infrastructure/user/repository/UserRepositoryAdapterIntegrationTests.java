@@ -9,18 +9,17 @@ import com.artseek.domain.user.Role;
 import com.artseek.domain.user.User;
 import com.artseek.domain.user.Username;
 import com.artseek.domain.user.repository.UserRepository;
-import com.artseek.shared.JpaIntegrationTest;
+import com.artseek.shared.JdbcIntegrationTest;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Import(UserRepositoryAdapter.class)
-class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
+class UserRepositoryAdapterIntegrationTests extends JdbcIntegrationTest {
 
     private static final String PASSWORD_HASH =
             "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaGhhc2g";
@@ -29,9 +28,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private TestEntityManager entityManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -46,8 +42,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void retrievesAPersistedUserById() {
         User savedUser = userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
-        entityManager.clear();
 
         assertThat(userRepository.findById(savedUser.getId()))
                 .isPresent()
@@ -63,8 +57,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void findsUsersByNormalizedUsernameAndEmail() {
         User savedUser = userRepository.save(newUser("Ada", "Ada@Example.org"));
-        entityManager.flush();
-        entityManager.clear();
 
         assertThat(userRepository.findByUsername(new Username("  ADA ")))
                 .get()
@@ -91,7 +83,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void storesNormalizedIdentifiersTheEncodedHashAndTheRoleName() {
         User savedUser = userRepository.save(newUser("  Ada ", " ADA@Example.org "));
-        entityManager.flush();
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 "select username, email, password_hash, role from users where id = ?",
@@ -108,7 +99,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     void persistsAnAdministratorRoleByName() {
         User savedAdministrator = userRepository.save(User.createAdministrator(
                 new Username("grace"), new Email("grace@example.org"), new PasswordHash(PASSWORD_HASH)));
-        entityManager.flush();
 
         assertThat(jdbcTemplate.queryForObject(
                 "select role from users where id = ?", String.class, savedAdministrator.getId()))
@@ -118,27 +108,19 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void rejectsADuplicateUsernameRegardlessOfCase() {
         userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
 
-        assertThatThrownBy(() -> {
-            userRepository.save(newUser("ADA", "other@example.org"));
-            entityManager.flush();
-        })
+        assertThatThrownBy(() -> userRepository.save(newUser("ADA", "other@example.org")))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining(User.USERNAME_CONSTRAINT);
+                .hasMessageContaining(UserPersistenceModel.USERNAME_CONSTRAINT);
     }
 
     @Test
     void rejectsADuplicateEmailRegardlessOfCase() {
         userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
 
-        assertThatThrownBy(() -> {
-            userRepository.save(newUser("grace", "ADA@example.org"));
-            entityManager.flush();
-        })
+        assertThatThrownBy(() -> userRepository.save(newUser("grace", "ADA@example.org")))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining(User.EMAIL_CONSTRAINT);
+                .hasMessageContaining(UserPersistenceModel.EMAIL_CONSTRAINT);
     }
 
     @Test
@@ -147,8 +129,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
 
         savedUser.changePasswordHash(new PasswordHash(OTHER_PASSWORD_HASH));
         User updatedUser = userRepository.save(savedUser);
-        entityManager.flush();
-        entityManager.clear();
 
         User reloadedUser = userRepository.findById(updatedUser.getId()).orElseThrow();
         assertThat(reloadedUser.getPasswordHash()).isEqualTo(new PasswordHash(OTHER_PASSWORD_HASH));

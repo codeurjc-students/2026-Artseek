@@ -1,58 +1,22 @@
 package com.artseek.domain.user;
 
 import com.artseek.domain.user.exceptions.InvalidRoleException;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 /**
  * A registered account. Ordinary registration always grants {@link Role#USER}; administrators
  * can only be created through the explicit {@link #createAdministrator} factory.
  */
-@Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(name = User.USERNAME_CONSTRAINT, columnNames = "username"),
-        @UniqueConstraint(name = User.EMAIL_CONSTRAINT, columnNames = "email")
-})
 public class User {
 
-    public static final String USERNAME_CONSTRAINT = "uq_users_username";
-    public static final String EMAIL_CONSTRAINT = "uq_users_email";
+    private final Long id;
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private final Username username;
 
-    @Embedded
-    @AttributeOverride(name = "value",
-            column = @Column(name = "username", nullable = false, length = Username.MAX_LENGTH))
-    private Username username;
+    private final Email email;
 
-    @Embedded
-    @AttributeOverride(name = "value",
-            column = @Column(name = "email", nullable = false, length = Email.MAX_LENGTH))
-    private Email email;
-
-    @Embedded
-    @AttributeOverride(name = "encoded",
-            column = @Column(name = "password_hash", nullable = false, length = PasswordHash.MAX_LENGTH))
     private PasswordHash passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private Role role;
-
-    /** Required by JPA. Domain code should use the factories. */
-    protected User() {
-    }
+    private final Role role;
 
     private User(Long id, Username username, Email email, PasswordHash passwordHash, Role role) {
         this.id = id;

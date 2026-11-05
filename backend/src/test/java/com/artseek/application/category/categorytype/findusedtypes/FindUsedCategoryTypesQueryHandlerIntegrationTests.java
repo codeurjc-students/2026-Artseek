@@ -7,14 +7,14 @@ import com.artseek.domain.category.Category;
 import com.artseek.domain.category.CategoryType;
 import com.artseek.domain.category.repository.CategoryRepository;
 import com.artseek.infrastructure.category.repository.CategoryRepositoryAdapter;
-import com.artseek.shared.JpaIntegrationTest;
+import com.artseek.shared.JdbcIntegrationTest;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 @Import({CategoryRepositoryAdapter.class, FindUsedCategoryTypesQueryHandler.class})
-class FindUsedCategoryTypesQueryHandlerIntegrationTests extends JpaIntegrationTest {
+class FindUsedCategoryTypesQueryHandlerIntegrationTests extends JdbcIntegrationTest {
 
     @Autowired
     private FindUsedCategoryTypesQueryHandler handler;

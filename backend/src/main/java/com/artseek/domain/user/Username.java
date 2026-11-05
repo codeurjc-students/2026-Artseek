@@ -1,12 +1,10 @@
 package com.artseek.domain.user;
 
 import com.artseek.domain.user.exceptions.InvalidUsernameException;
-import jakarta.persistence.Embeddable;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
 /** A unique public account identifier, normalized to trimmed lowercase. */
-@Embeddable
 public record Username(String value) {
 
     public static final int MIN_LENGTH = 3;

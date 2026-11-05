@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.artseek.domain.category.Category;
 import com.artseek.domain.category.CategoryType;
 import com.artseek.domain.category.repository.CategoryRepository;
-import com.artseek.shared.JpaIntegrationTest;
+import com.artseek.shared.JdbcIntegrationTest;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Import(CategoryRepositoryAdapter.class)
-class CategoryRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
+class CategoryRepositoryAdapterIntegrationTests extends JdbcIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;

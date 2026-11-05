@@ -9,42 +9,52 @@ import com.artseek.domain.category.Category;
 import com.artseek.domain.category.CategoryType;
 import com.artseek.domain.category.repository.CategoryRepository;
 
-@Repository 
+@Repository
 public class CategoryRepositoryAdapter implements CategoryRepository {
-    
-    private final SpringDataCategoryRepository springCategoryRepository;  
-    
-    public CategoryRepositoryAdapter(SpringDataCategoryRepository springCategoryRepository) {
-        this.springCategoryRepository = springCategoryRepository;
+
+    private final SpringDataCategoryRepository springDataCategoryRepository;
+
+    public CategoryRepositoryAdapter(SpringDataCategoryRepository springDataCategoryRepository) {
+        this.springDataCategoryRepository = springDataCategoryRepository;
     }
 
     @Override
     public Optional<Category> findById(Long id) {
-        return springCategoryRepository.findById(id);
+        return springDataCategoryRepository.findById(id).map(CategoryMapper::toDomain);
     }
 
     @Override
     public List<Category> findByType(CategoryType type) {
-        return springCategoryRepository.findByType(type);
+        return springDataCategoryRepository.findByType(type.name()).stream()
+                .map(CategoryMapper::toDomain)
+                .toList();
     }
 
     @Override
     public List<CategoryType> findUsedTypes() {
-        return springCategoryRepository.findUsedTypes();
+        return springDataCategoryRepository.findUsedTypes().stream()
+                .map(CategoryType::valueOf)
+                .toList();
     }
 
     @Override
     public boolean existsByNameAndType(String name, CategoryType type) {
-        return springCategoryRepository.existsByNameAndType(name, type);
+        return springDataCategoryRepository.existsByNameAndType(name, type.name());
     }
 
     @Override
     public Category save(Category category) {
-        return springCategoryRepository.save(category);
+        CategoryPersistenceModel saved = springDataCategoryRepository.save(CategoryMapper.toPersistence(category));
+        return CategoryMapper.toDomain(saved);
     }
 
     @Override
     public List<Category> saveAll(List<Category> categories) {
-        return springCategoryRepository.saveAll(categories);
+        List<CategoryPersistenceModel> models = categories.stream()
+                .map(CategoryMapper::toPersistence)
+                .toList();
+        return springDataCategoryRepository.saveAll(models).stream()
+                .map(CategoryMapper::toDomain)
+                .toList();
     }
 }

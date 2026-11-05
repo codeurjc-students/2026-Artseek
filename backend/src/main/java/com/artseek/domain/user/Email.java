@@ -1,12 +1,10 @@
 package com.artseek.domain.user;
 
 import com.artseek.domain.user.exceptions.InvalidEmailException;
-import jakarta.persistence.Embeddable;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
 /** A unique account email address, normalized to trimmed lowercase. */
-@Embeddable
 public record Email(String value) {
 
     public static final int MAX_LENGTH = 254;
