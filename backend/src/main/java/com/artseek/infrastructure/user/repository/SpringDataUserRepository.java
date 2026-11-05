@@ -2,19 +2,15 @@ package com.artseek.infrastructure.user.repository;
 
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.ListCrudRepository;
 
-import com.artseek.domain.user.Email;
-import com.artseek.domain.user.User;
-import com.artseek.domain.user.Username;
+interface SpringDataUserRepository extends ListCrudRepository<UserPersistenceModel, Long> {
 
-public interface SpringDataUserRepository extends JpaRepository<User, Long> {
+    Optional<UserPersistenceModel> findByUsername(String username);
 
-    Optional<User> findByUsername(Username username);
+    Optional<UserPersistenceModel> findByEmail(String email);
 
-    Optional<User> findByEmail(Email email);
+    boolean existsByUsername(String username);
 
-    boolean existsByUsername(Username username);
-
-    boolean existsByEmail(Email email);
+    boolean existsByEmail(String email);
 }

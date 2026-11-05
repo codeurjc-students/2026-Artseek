@@ -20,6 +20,27 @@ class CategoryUnitTests {
     }
 
     @Test
+    void restoresAnExistingCategoryWithItsIdentifier() {
+        Category category = Category.restore(7L, "Surrealism", CategoryType.PAINTING);
+
+        assertThat(category.getId()).isEqualTo(7L);
+        assertThat(category.getName()).isEqualTo("Surrealism");
+        assertThat(category.getType()).isEqualTo(CategoryType.PAINTING);
+    }
+
+    @Test
+    void validatesRestoredValuesAgain() {
+        assertThat(Category.restore(7L, "  Surrealism  ", CategoryType.PAINTING).getName())
+                .isEqualTo("Surrealism");
+        assertThatThrownBy(() -> Category.restore(7L, " ", CategoryType.PAINTING))
+                .isInstanceOf(InvalidCategoryNameException.class)
+                .extracting(exception -> ((InvalidCategoryNameException) exception).getInvalidName())
+                .isEqualTo(" ");
+        assertThatThrownBy(() -> Category.restore(7L, "Surrealism", null))
+                .isInstanceOf(InvalidCategoryTypeException.class);
+    }
+
+    @Test
     void rejectsAnInvalidName() {
         assertThatThrownBy(() -> new Category(null, CategoryType.PAINTING))
                 .isInstanceOf(InvalidCategoryNameException.class)

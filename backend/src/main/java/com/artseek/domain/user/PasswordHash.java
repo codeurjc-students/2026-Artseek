@@ -1,7 +1,6 @@
 package com.artseek.domain.user;
 
 import com.artseek.domain.user.exceptions.InvalidPasswordHashException;
-import jakarta.persistence.Embeddable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -13,7 +12,6 @@ import java.util.regex.Pattern;
  * needed for verification and future rehashing. Only encoded hashes are accepted, so a plaintext
  * password cannot be stored. {@link #toString()} never reveals the encoded value.
  */
-@Embeddable
 public record PasswordHash(String encoded) {
 
     public static final String ALGORITHM = "argon2id";

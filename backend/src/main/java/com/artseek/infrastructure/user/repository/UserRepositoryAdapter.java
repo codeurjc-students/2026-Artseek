@@ -12,39 +12,40 @@ import com.artseek.domain.user.repository.UserRepository;
 @Repository
 public class UserRepositoryAdapter implements UserRepository {
 
-    private final SpringDataUserRepository springUserRepository;
+    private final SpringDataUserRepository springDataUserRepository;
 
-    public UserRepositoryAdapter(SpringDataUserRepository springUserRepository) {
-        this.springUserRepository = springUserRepository;
+    public UserRepositoryAdapter(SpringDataUserRepository springDataUserRepository) {
+        this.springDataUserRepository = springDataUserRepository;
     }
 
     @Override
     public Optional<User> findById(Long id) {
-        return springUserRepository.findById(id);
+        return springDataUserRepository.findById(id).map(UserMapper::toDomain);
     }
 
     @Override
     public Optional<User> findByUsername(Username username) {
-        return springUserRepository.findByUsername(username);
+        return springDataUserRepository.findByUsername(username.value()).map(UserMapper::toDomain);
     }
 
     @Override
     public Optional<User> findByEmail(Email email) {
-        return springUserRepository.findByEmail(email);
+        return springDataUserRepository.findByEmail(email.value()).map(UserMapper::toDomain);
     }
 
     @Override
     public boolean existsByUsername(Username username) {
-        return springUserRepository.existsByUsername(username);
+        return springDataUserRepository.existsByUsername(username.value());
     }
 
     @Override
     public boolean existsByEmail(Email email) {
-        return springUserRepository.existsByEmail(email);
+        return springDataUserRepository.existsByEmail(email.value());
     }
 
     @Override
     public User save(User user) {
-        return springUserRepository.save(user);
+        UserPersistenceModel saved = springDataUserRepository.save(UserMapper.toPersistence(user));
+        return UserMapper.toDomain(saved);
     }
 }

@@ -1,19 +1,23 @@
 package com.artseek.infrastructure.category.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.artseek.domain.category.Category;
 import com.artseek.domain.category.CategoryType;
 import com.artseek.domain.category.repository.CategoryRepository;
-import com.artseek.shared.JpaIntegrationTest;
+import com.artseek.shared.JdbcIntegrationTest;
+
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Import(CategoryRepositoryAdapter.class)
-class CategoryRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
+class CategoryRepositoryAdapterIntegrationTests extends JdbcIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -49,9 +53,44 @@ class CategoryRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
                 .isPresent()
                 .get()
                 .satisfies(category -> {
+                    assertThat(category.getId()).isEqualTo(savedCategory.getId());
                     assertThat(category.getName()).isEqualTo("Surrealism");
                     assertThat(category.getType()).isEqualTo(CategoryType.PAINTING);
                 });
+    }
+
+    @Test
+    void savesARenamedCategory() {
+        Category category = categoryRepository.save(new Category("Surealism", CategoryType.PAINTING));
+
+        category.rename("Surrealism");
+        categoryRepository.save(category);
+
+        assertThat(categoryRepository.findByType(CategoryType.PAINTING))
+                .singleElement()
+                .satisfies(renamed -> {
+                    assertThat(renamed.getId()).isEqualTo(category.getId());
+                    assertThat(renamed.getName()).isEqualTo("Surrealism");
+                });
+    }
+
+    @Test
+    void rejectsADuplicateNameWithinTheSameType() {
+        categoryRepository.save(new Category("Watercolor", CategoryType.PAINTING));
+
+        assertThatThrownBy(() -> categoryRepository.save(new Category("Watercolor", CategoryType.PAINTING)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining(CategoryPersistenceModel.NAME_TYPE_CONSTRAINT);
+    }
+
+    @Test
+    void allowsTheSameNameForDifferentTypes() {
+        categoryRepository.save(new Category("Watercolor", CategoryType.PAINTING));
+
+        categoryRepository.save(new Category("Watercolor", CategoryType.TATTOO));
+
+        assertThat(categoryRepository.existsByNameAndType("Watercolor", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Watercolor", CategoryType.TATTOO)).isTrue();
     }
 
     @Test
@@ -89,21 +128,26 @@ class CategoryRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     }
 
     @Test
-    void findsACategoryByNameAndType() {
+    void reportsWhetherACategoryExistsByNameAndType() {
         categoryRepository.save(new Category("Surrealism", CategoryType.PAINTING));
 
-        assertThat(categoryRepository.findByNameAndType("Surrealism", CategoryType.PAINTING))
-                .isPresent()
-                .get()
-                .extracting(Category::getName)
-                .isEqualTo("Surrealism");
+        assertThat(categoryRepository.existsByNameAndType("Surrealism", CategoryType.PAINTING)).isTrue();
+        assertThat(categoryRepository.existsByNameAndType("Cubism", CategoryType.PAINTING)).isFalse();
+        assertThat(categoryRepository.existsByNameAndType("Surrealism", CategoryType.TATTOO)).isFalse();
     }
 
     @Test
-    void returnsEmptyWhenNameAndTypeDoNotMatch() {
-        categoryRepository.save(new Category("Surrealism", CategoryType.PAINTING));
+    void savesAllCategoriesAndReturnsThemWithIdentifiers() {
+        List<Category> savedCategories = categoryRepository.saveAll(List.of(
+                new Category("Surrealism", CategoryType.PAINTING),
+                new Category("Blackwork", CategoryType.TATTOO)));
 
-        assertThat(categoryRepository.findByNameAndType("Cubism", CategoryType.PAINTING))
-                .isEmpty();
+        assertThat(savedCategories)
+                .extracting(Category::getId)
+                .doesNotContainNull()
+                .doesNotHaveDuplicates();
+        assertThat(savedCategories)
+                .extracting(Category::getName)
+                .containsExactly("Surrealism", "Blackwork");
     }
 }

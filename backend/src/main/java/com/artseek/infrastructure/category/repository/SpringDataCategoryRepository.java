@@ -1,20 +1,16 @@
 package com.artseek.infrastructure.category.repository;
 
 import java.util.List;
-import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jdbc.repository.query.Query;
+import org.springframework.data.repository.ListCrudRepository;
 
-import com.artseek.domain.category.Category;
-import com.artseek.domain.category.CategoryType;
+interface SpringDataCategoryRepository extends ListCrudRepository<CategoryPersistenceModel, Long> {
 
-public interface SpringDataCategoryRepository extends JpaRepository<Category, Long> {
+    List<CategoryPersistenceModel> findByType(String type);
 
-    List<Category> findByType(CategoryType type);
+    boolean existsByNameAndType(String name, String type);
 
-    @Query("select distinct category.type from Category category order by category.type")
-    List<CategoryType> findUsedTypes();
-
-    Optional<Category> findByNameAndType(String name, CategoryType type);
+    @Query("SELECT DISTINCT type FROM categories ORDER BY type")
+    List<String> findUsedTypes();
 }

@@ -2,6 +2,7 @@ package com.artseek;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
@@ -18,7 +19,10 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
 
@@ -30,14 +34,21 @@ class HexagonalArchitectureUnitTests {
     private static final String SHARED_DOMAIN_PACKAGE = "shared";
 
     @ArchTest
-    static final ArchRule domainDoesNotDependOnOuterLayersOrSpringWebOrData = noClasses()
+    static final ArchRule domainDependsOnlyOnTheJdkAndItself = classes()
             .that().resideInAPackage(DOMAIN_PACKAGE + "..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.artseek.application..",
-                    INFRASTRUCTURE_PACKAGE + "..",
-                    "org.springframework.web..",
-                    "org.springframework.http..",
-                    "org.springframework.data..");
+            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", DOMAIN_PACKAGE + "..");
+
+    @ArchTest
+    static final ArchRule noClassUsesJpaOrHibernate = noClasses()
+            .should().dependOnClassesThat().resideInAnyPackage("jakarta.persistence..", "org.hibernate..");
+
+    @ArchTest
+    static final ArchRule persistenceInternalsStayInTheirRepositoryPackage = classes()
+            .that().haveSimpleNameEndingWith("PersistenceModel")
+            .or().haveSimpleNameEndingWith("Mapper")
+            .or().haveSimpleNameStartingWith("SpringData")
+            .and().resideInAPackage(INFRASTRUCTURE_PACKAGE + ".*.repository")
+            .should(onlyBeUsedFromTheirOwnPackage());
 
     @ArchTest
     static final ArchRule applicationDoesNotDependOnInfrastructure = noClasses()
@@ -58,6 +69,20 @@ class HexagonalArchitectureUnitTests {
         slices().assignedFrom(new AggregateInfrastructureSlices(domainAggregatesOf(classes)))
                 .should().notDependOnEachOther()
                 .check(classes);
+    }
+
+    /** Persistence models, mappers and Spring Data repositories are used only by their own adapter. */
+    private static ArchCondition<JavaClass> onlyBeUsedFromTheirOwnPackage() {
+        return new ArchCondition<>("only be used from their own package") {
+            @Override
+            public void check(JavaClass target, ConditionEvents events) {
+                target.getDirectDependenciesToSelf().stream()
+                        .filter(dependency -> !dependency.getOriginClass().getPackageName()
+                                .equals(target.getPackageName()))
+                        .forEach(dependency -> events.add(
+                                SimpleConditionEvent.violated(dependency, dependency.getDescription())));
+            }
+        };
     }
 
     private static Set<String> domainAggregatesOf(JavaClasses classes) {

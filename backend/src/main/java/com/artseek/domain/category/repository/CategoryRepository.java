@@ -14,9 +14,9 @@ public interface CategoryRepository {
 
     List<CategoryType> findUsedTypes();
 
-    Optional<Category> findByNameAndType(String name, CategoryType type);
+    boolean existsByNameAndType(String name, CategoryType type);
 
     Category save(Category category);
 
-    void saveAll(List<Category> categories);
+    List<Category> saveAll(List<Category> categories);
 }

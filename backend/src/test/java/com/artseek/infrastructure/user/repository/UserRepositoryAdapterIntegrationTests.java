@@ -9,19 +9,17 @@ import com.artseek.domain.user.Role;
 import com.artseek.domain.user.User;
 import com.artseek.domain.user.Username;
 import com.artseek.domain.user.repository.UserRepository;
-import com.artseek.shared.JpaIntegrationTest;
+import com.artseek.shared.JdbcIntegrationTest;
 
-import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Import(UserRepositoryAdapter.class)
-class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
+class UserRepositoryAdapterIntegrationTests extends JdbcIntegrationTest {
 
     private static final String PASSWORD_HASH =
             "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaGhhc2g";
@@ -32,44 +30,34 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private TestEntityManager entityManager;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void savesAUserAndAssignsItsIdentifierAndTimestamps() {
+    void savesAUserAndAssignsItsIdentifier() {
         User savedUser = userRepository.save(newUser("ada", "ada@example.org"));
 
         assertThat(savedUser.getId()).isNotNull().isPositive();
-        assertThat(savedUser.getCreatedAt()).isNotNull();
-        assertThat(savedUser.getUpdatedAt()).isEqualTo(savedUser.getCreatedAt());
     }
 
     @Test
     void retrievesAPersistedUserById() {
         User savedUser = userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
-        entityManager.clear();
 
         assertThat(userRepository.findById(savedUser.getId()))
                 .isPresent()
                 .get()
                 .satisfies(user -> {
+                    assertThat(user.getId()).isEqualTo(savedUser.getId());
                     assertThat(user.getUsername()).isEqualTo(new Username("ada"));
                     assertThat(user.getEmail()).isEqualTo(new Email("ada@example.org"));
                     assertThat(user.getPasswordHash()).isEqualTo(new PasswordHash(PASSWORD_HASH));
                     assertThat(user.getRole()).isEqualTo(Role.USER);
-                    assertThat(user.getCreatedAt()).isEqualTo(savedUser.getCreatedAt());
-                    assertThat(user.getUpdatedAt()).isEqualTo(savedUser.getUpdatedAt());
                 });
     }
 
     @Test
     void findsUsersByNormalizedUsernameAndEmail() {
         User savedUser = userRepository.save(newUser("Ada", "Ada@Example.org"));
-        entityManager.flush();
-        entityManager.clear();
 
         assertThat(userRepository.findByUsername(new Username("  ADA ")))
                 .get()
@@ -96,7 +84,6 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void storesNormalizedIdentifiersTheEncodedHashAndTheRoleName() {
         User savedUser = userRepository.save(newUser("  Ada ", " ADA@Example.org "));
-        entityManager.flush();
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 "select username, email, password_hash, role from users where id = ?",
@@ -112,8 +99,7 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void persistsAnAdministratorRoleByName() {
         User savedAdministrator = userRepository.save(User.createAdministrator(
-                "grace", "grace@example.org", PASSWORD_HASH));
-        entityManager.flush();
+                new Username("grace"), new Email("grace@example.org"), new PasswordHash(PASSWORD_HASH)));
 
         assertThat(jdbcTemplate.queryForObject(
                 "select role from users where id = ?", String.class, savedAdministrator.getId()))
@@ -123,46 +109,33 @@ class UserRepositoryAdapterIntegrationTests extends JpaIntegrationTest {
     @Test
     void rejectsADuplicateUsernameRegardlessOfCase() {
         userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
 
-        assertThatThrownBy(() -> {
-            userRepository.save(newUser("ADA", "other@example.org"));
-            entityManager.flush();
-        })
+        assertThatThrownBy(() -> userRepository.save(newUser("ADA", "other@example.org")))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining(User.USERNAME_CONSTRAINT);
+                .hasMessageContaining(UserPersistenceModel.USERNAME_CONSTRAINT);
     }
 
     @Test
     void rejectsADuplicateEmailRegardlessOfCase() {
         userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
 
-        assertThatThrownBy(() -> {
-            userRepository.save(newUser("grace", "ADA@example.org"));
-            entityManager.flush();
-        })
+        assertThatThrownBy(() -> userRepository.save(newUser("grace", "ADA@example.org")))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining(User.EMAIL_CONSTRAINT);
+                .hasMessageContaining(UserPersistenceModel.EMAIL_CONSTRAINT);
     }
 
     @Test
-    void refreshesOnlyTheUpdateTimestampWhenAUserChanges() {
+    void persistsAChangedPasswordHash() {
         User savedUser = userRepository.save(newUser("ada", "ada@example.org"));
-        entityManager.flush();
-        Instant createdAt = savedUser.getCreatedAt();
 
-        savedUser.changePasswordHash(OTHER_PASSWORD_HASH);
-        entityManager.flush();
-        entityManager.clear();
+        savedUser.changePasswordHash(new PasswordHash(OTHER_PASSWORD_HASH));
+        User updatedUser = userRepository.save(savedUser);
 
-        User reloadedUser = userRepository.findById(savedUser.getId()).orElseThrow();
+        User reloadedUser = userRepository.findById(updatedUser.getId()).orElseThrow();
         assertThat(reloadedUser.getPasswordHash()).isEqualTo(new PasswordHash(OTHER_PASSWORD_HASH));
-        assertThat(reloadedUser.getCreatedAt()).isEqualTo(createdAt);
-        assertThat(reloadedUser.getUpdatedAt()).isAfterOrEqualTo(createdAt);
     }
 
     private static User newUser(String username, String email) {
-        return User.register(username, email, PASSWORD_HASH);
+        return User.register(new Username(username), new Email(email), new PasswordHash(PASSWORD_HASH));
     }
 }

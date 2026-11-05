@@ -23,7 +23,7 @@ The planned architecture also includes a separate context for AI artwork analysi
 | Aspect | Current implementation |
 | --- | --- |
 | Type | Web SPA and REST API, with one backend application and one relational database. |
-| Technologies | React, TypeScript, React Router, React-Bootstrap, Bootstrap and Tailwind CSS; Java, Spring Boot, Spring Data JPA and PostgreSQL. |
+| Technologies | React, TypeScript, React Router, React-Bootstrap, Bootstrap and Tailwind CSS; Java, Spring Boot, Spring Data JDBC, Flyway and PostgreSQL. |
 | Tools | Visual Studio Code with Spring Boot extensions, IntelliJ IDEA, Git, GitHub, Maven, Node.js, pnpm, Vite, Docker, Postman and OpenAPI tooling. |
 | Quality control | Backend unit, integration and HTTP system tests; frontend unit tests, TypeScript checks and production builds; GitHub Actions and required checks before merging. Backend SonarQube Cloud static analysis and JaCoCo coverage feed a quality gate in PR quality assurance; see the setup guide for service configuration and required checks. |
 | Deployment | Local frontend and backend processes, with PostgreSQL 17 in a Docker container. Application container images and a production deployment have not been configured. |
@@ -37,8 +37,9 @@ The backend dependencies are declared in [`backend/pom.xml`](../backend/pom.xml)
 | --- | --- |
 | [Java](https://dev.java/) 25 LTS and [Spring Boot](https://spring.io/projects/spring-boot) 4.1.1 | Implement the REST API, dependency injection, application startup and transaction management. The Java version file currently specifies `25.0.4.1`. |
 | [Spring Web MVC](https://docs.spring.io/spring-framework/reference/web/webmvc.html) | Maps HTTP requests to controllers and serializes application DTOs as JSON. |
-| [Spring Data JPA](https://spring.io/projects/spring-data-jpa) and [Hibernate ORM](https://hibernate.org/orm/) | Implement persistence adapters and map the `Category` entity to PostgreSQL. |
-| [PostgreSQL](https://www.postgresql.org/docs/17/) 17 | Stores categories in the local development database. Hibernate currently updates the schema through `spring.jpa.hibernate.ddl-auto=update`. |
+| [Spring Data JDBC](https://spring.io/projects/spring-data-jdbc) | Implements the persistence adapters. Each aggregate has an infrastructure persistence model and mapper, so the domain stays free of persistence annotations. |
+| [Flyway](https://documentation.red-gate.com/flyway) | Applies the hand-written SQL migrations in `backend/src/main/resources/db/migration/`, the single source of truth for the schema in the application and the tests. |
+| [PostgreSQL](https://www.postgresql.org/docs/17/) 17 | Stores categories and user accounts in the local development database. |
 | [React](https://react.dev/) 19.3.0 and [TypeScript](https://www.typescriptlang.org/) 5.9.3 | Define the frontend components and typed API contracts. TypeScript is compiled to JavaScript for the browser. |
 | [React Router](https://reactrouter.com/) 8.4.0 | Defines the home, category and health routes. Framework mode is configured with `ssr: false`, so the application runs as a client SPA. |
 | [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) | The application-owned `app/utils/api-request.ts` wrapper centralizes native request options, response parsing and unsuccessful HTTP responses. Feature API services own endpoints, validation and DTO mapping. |
@@ -128,12 +129,14 @@ REST controller
     -> Query handler
       -> Domain repository port
         -> Repository adapter
-          -> Spring Data JPA -> PostgreSQL
+          -> Mapper + Spring Data JDBC -> PostgreSQL
 ```
 
-- **Domain:** `Category`, the `CategoryType` enum, `User` with its `Username`, `Email` and `PasswordHash` value objects and `Role` enum, validation exceptions and the `CategoryRepository` and `UserRepository` ports. Entities enforce their own invariants and use JPA annotations to avoid duplicating domain and persistence models.
+- **Domain:** `Category`, the `CategoryType` enum, `User` with its `Username`, `Email` and `PasswordHash` value objects and `Role` enum, validation exceptions and the `CategoryRepository` and `UserRepository` ports. The domain is plain Java with no persistence annotations. Aggregates enforce their own invariants; new ones are built through validating constructors or factories, and existing ones are rebuilt through `restore(...)`, which runs the same validation.
 - **Application:** Query records, query handlers and DTOs, organized by feature. Handlers normalize and validate input through domain types, call repository ports and map results into immutable DTO lists. Read handlers use `@Transactional(readOnly = true)`.
-- **Infrastructure:** REST controllers, the Spring mediator implementation, JPA repository adapters, CORS configuration and local sample-data initialization.
+- **Infrastructure:** REST controllers, the Spring mediator implementation, repository adapters, CORS configuration and local sample-data initialization. Each aggregate's `repository/` package holds its adapter, a `<Aggregate>PersistenceModel` record describing the table row, a `<Aggregate>Mapper` (`toPersistence` / `toDomain`) and a Spring Data JDBC repository. Only the adapter leaves that package.
+
+The schema is defined by hand-written Flyway migrations, one per table, in [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/). Ids are generated by the database; `created_at` and `updated_at` are filled by column defaults and an update trigger, and are not part of the domain. Database objects follow the `<type>_<table>_<columns>` naming convention, such as `pk_users` or `uq_categories_name_type`. The migration workflow and the full convention are in the [backend guide](../backend/README.md#database-schema-and-migrations).
 
 All three layers are organized by aggregate, so each concept uses the same package name in every layer:
 
@@ -157,7 +160,7 @@ Cross-cutting infrastructure stays at the top level of `infrastructure/`. [`Hexa
 
 [`SpringMediator`](../backend/src/main/java/com/artseek/infrastructure/mediator/SpringMediator.java) discovers injected command and query handlers, registers them by request class, and routes requests to the corresponding handler. It rejects duplicate registrations and reports missing handlers. The current category operations are synchronous queries against the same PostgreSQL database. Command interfaces and dispatch support exist, but no category write endpoint is exposed yet.
 
-Controllers depend on the application `Mediator` contract. `FindUsedCategoryTypesQueryHandler` and `FindCategoriesByTypeQueryHandler` depend on the domain repository port; `CategoryRepositoryAdapter` implements that port using Spring Data JPA. The API returns `CategoryDTO` and `CategoryTypeDTO` records, keeping domain entities inside the backend.
+Controllers depend on the application `Mediator` contract. `FindUsedCategoryTypesQueryHandler` and `FindCategoriesByTypeQueryHandler` depend on the domain repository port; `CategoryRepositoryAdapter` implements that port using Spring Data JDBC. The API returns `CategoryDTO` and `CategoryTypeDTO` records, keeping domain entities inside the backend.
 
 [`DatabaseInitializer`](../backend/src/main/java/com/artseek/infrastructure/bootstrap/DatabaseInitializer.java) runs only with the `local` Spring profile. It inserts three painting categories—Surrealism, Impressionism and Realism—and two tattoo categories—Blackwork and Watercolor. It checks each name/type pair before inserting it, so restarting with existing sample rows does not insert them again.
 
@@ -198,7 +201,7 @@ The [generated HTML API reference](https://raw.githack.com/codeurjc-students/202
 
 The generated YAML currently lists successful responses; the invalid-type `400` behavior is implemented in the controller and covered by its tests and the Postman examples. The health endpoint is an HTTP availability check, rather than a report of individual dependency status.
 
-The [security contract](security-contract.md) defines accounts, permissions, the planned authentication API, the JWT lifecycle, CSRF integration and the endpoint access matrix. User accounts are persisted through the `UserRepository` port and its JPA adapter; Spring Security is not enabled yet, so every endpoint above remains public.
+The [security contract](security-contract.md) defines accounts, permissions, the planned authentication API, the JWT lifecycle, CSRF integration and the endpoint access matrix. User accounts are persisted through the `UserRepository` port and its Spring Data JDBC adapter; Spring Security is not enabled yet, so every endpoint above remains public.
 
 ## Quality control
 
@@ -218,13 +221,13 @@ The implemented technical features are traceable to GitHub issues. The functiona
 
 Backend tests use [JUnit](https://junit.org/), [Mockito](https://site.mockito.org/), [AssertJ](https://assertj.github.io/doc/) and [Spring Boot test support](https://docs.spring.io/spring-boot/reference/testing/index.html). Unit tests isolate domain/application classes or the MVC boundary. Integration tests exercise real Spring components and persistence; the system test starts an actual HTTP server on a random port.
 
-Database integration and system tests share the abstract [`shared.IntegrationTest`](../backend/src/test/java/com/artseek/shared/IntegrationTest.java) base, which imports [`PostgresTestConfiguration`](../backend/src/test/java/com/artseek/infrastructure/config/PostgresTestConfiguration.java). Handler and repository slices extend [`JpaIntegrationTest`](../backend/src/test/java/com/artseek/shared/JpaIntegrationTest.java), inheriting `@DataJpaTest` and `@AutoConfigureTestDatabase(replace = NONE)`; their concrete classes only add focused handler/adapter `@Import` annotations. Controller, application and bootstrap integration tests extend [`FullContextIntegrationTest`](../backend/src/test/java/com/artseek/shared/FullContextIntegrationTest.java), inheriting `@SpringBootTest` and `@Transactional`, including read-only application tests. Controller integration tests additionally declare `@AutoConfigureMockMvc`. HTTP system tests extend [`SystemTest`](../backend/src/test/java/com/artseek/shared/SystemTest.java), inheriting random-port `@SpringBootTest`, `@AutoConfigureRestTestClient` and the protected `restTestClient`; concrete system tests only need their `@Test` methods and any fixture/cleanup setup. Do not duplicate inherited annotations or combine JPA slices with full-context annotations. Unit and controller web-slice tests extend none of these bases: use plain JUnit/Mockito or `@WebMvcTest` with mocked dependencies. The complete inheritance and annotation table is in the [backend testing guide](../backend/README.md#tests-and-coverage).
+Database integration and system tests share the abstract [`shared.IntegrationTest`](../backend/src/test/java/com/artseek/shared/IntegrationTest.java) base, which imports [`PostgresTestConfiguration`](../backend/src/test/java/com/artseek/infrastructure/config/PostgresTestConfiguration.java). Handler and repository slices extend [`JdbcIntegrationTest`](../backend/src/test/java/com/artseek/shared/JdbcIntegrationTest.java), inheriting `@DataJdbcTest` and `@AutoConfigureTestDatabase(replace = NONE)`; their concrete classes only add focused handler/adapter `@Import` annotations. Controller, application and bootstrap integration tests extend [`FullContextIntegrationTest`](../backend/src/test/java/com/artseek/shared/FullContextIntegrationTest.java), inheriting `@SpringBootTest` and `@Transactional`, including read-only application tests. Controller integration tests additionally declare `@AutoConfigureMockMvc`. HTTP system tests extend [`SystemTest`](../backend/src/test/java/com/artseek/shared/SystemTest.java), inheriting random-port `@SpringBootTest`, `@AutoConfigureRestTestClient` and the protected `restTestClient`; concrete system tests only need their `@Test` methods and any fixture/cleanup setup. Do not duplicate inherited annotations or combine JDBC slices with full-context annotations. Unit and controller web-slice tests extend none of these bases: use plain JUnit/Mockito or `@WebMvcTest` with mocked dependencies. The complete inheritance and annotation table is in the [backend testing guide](../backend/README.md#tests-and-coverage).
 
-JPA slices verify focused persistence and use-case behavior: a handler test invokes the handler directly and exercises its real repository adapter, JPA queries and PostgreSQL, checking results such as filtering, generated IDs and DTO mapping. Controllers and the real mediator are not loaded automatically. Full-context tests load the complete application to check real component wiring and collaboration across layers; a controller test using MockMvc exercises routing, validation, JSON and the controller/mediator/handler/adapter/database path. Application/bootstrap tests use that same full context to check startup wiring and initializer behavior. Neither base starts a listening HTTP server, and loading every bean does not mean every bean is exercised by each test. Both bases roll back test-thread writes after every test. System tests add actual HTTP transport through a running server and need explicit cleanup for committed writes.
+JDBC slices verify focused persistence and use-case behavior: a handler test invokes the handler directly and exercises its real repository adapter, Spring Data JDBC queries and PostgreSQL, checking results such as filtering, generated IDs and DTO mapping. Repository adapter integration tests save and reload aggregates; because Spring Data JDBC does not validate the schema, they are the check that the persistence models match the migrations. Mapper unit tests cover each conversion without a database. Controllers and the real mediator are not loaded automatically. Full-context tests load the complete application to check real component wiring and collaboration across layers; a controller test using MockMvc exercises routing, validation, JSON and the controller/mediator/handler/adapter/database path. Application/bootstrap tests use that same full context to check startup wiring and initializer behavior. Neither base starts a listening HTTP server, and loading every bean does not mean every bean is exercised by each test. Both bases roll back test-thread writes after every test. System tests add actual HTTP transport through a running server and need explicit cleanup for committed writes.
 
 The shared test configuration supplies a disposable `postgres:17.11` [Testcontainers](https://java.testcontainers.org/) instance through Spring Boot's `@ServiceConnection`. This matches the development PostgreSQL 17 engine and the inspected local image version. Docker must be running; the development database itself is not required. Dynamic host ports and a separate `artseek_test` database prevent interference with the development container. Unit and controller web-slice tests run without Docker.
 
-[`backend/src/test/resources/application.properties`](../backend/src/test/resources/application.properties) retains Hibernate `create-drop` schema management. Each cached Spring context owns its container and shuts it down after closing database connections; compatible tests reuse that context. JPA slices and full-context tests inherit transaction rollback from their respective bases. Tests own their data and do not assume fixed generated IDs. The `local` profile remains disabled; the initializer integration test calls `init()` manually within its rollback transaction. HTTP system tests stay alongside their controller's tests. Their base does not declare `@Transactional`: server-side writes execute in another thread and cannot be rolled back by a test transaction. Commit fixtures before HTTP requests, then clean up test-owned fixtures and server writes after each mutating test with `@AfterEach` repository cleanup or an `@Sql` cleanup script using `AFTER_TEST_METHOD` and `@SqlConfig(transactionMode = ISOLATED)`. Read-only health tests need no cleanup. See the [backend testing guide](../backend/README.md#tests-and-coverage) for lifecycle and isolation details.
+Tests get their schema from the same Flyway migrations as the application: each new container starts empty and Flyway migrates it on context startup. Each cached Spring context owns its container and shuts it down after closing database connections; compatible tests reuse that context. JDBC slices and full-context tests inherit transaction rollback from their respective bases. Tests own their data and do not assume fixed generated IDs. The `local` profile remains disabled; the initializer integration test calls `init()` manually within its rollback transaction. HTTP system tests stay alongside their controller's tests. Their base does not declare `@Transactional`: server-side writes execute in another thread and cannot be rolled back by a test transaction. Commit fixtures before HTTP requests, then clean up test-owned fixtures and server writes after each mutating test with `@AfterEach` repository cleanup or an `@Sql` cleanup script using `AFTER_TEST_METHOD` and `@SqlConfig(transactionMode = ISOLATED)`. Read-only health tests need no cleanup. See the [backend testing guide](../backend/README.md#tests-and-coverage) for lifecycle and isolation details.
 
 ### Static analysis and coverage
 
@@ -308,24 +311,18 @@ docker info
 
 ### PostgreSQL
 
-From the repository root, create the development container with the command used by the project:
+From the repository root, start the development database with:
 
-```powershell
-docker run --name postgresDb -e POSTGRES_DB=artseek -e POSTGRES_USER=artseek -e POSTGRES_PASSWORD=artseek_dev_password -p 5432:5432 -v artseek_postgres_data:/var/lib/postgresql/data -d postgres:17
+```bash
+scripts/start_db.sh
 ```
 
-This manual command is the current setup. It will later be replaced by Docker Compose, with the database service configuration declared in a Compose file. That configuration has not been added yet.
+The script creates the `postgresDb` container (`postgres:17.11`, port 5432, database and user `artseek`) on first run, starts it on later runs, and waits until PostgreSQL accepts connections. The named volume `artseek_postgres_data` retains the database files. Run it from Git Bash on Windows. It is the current setup until Docker Compose replaces it.
 
-The named volume `artseek_postgres_data` retains the database files. On later sessions, start the existing container:
+The schema is created by Flyway when the backend starts. To discard all local data and start from an empty database, for example when the database was created by Hibernate before Flyway was introduced, run:
 
-```powershell
-docker start postgresDb
-```
-
-Check that PostgreSQL is accepting connections before starting the backend:
-
-```powershell
-docker exec postgresDb pg_isready -U artseek -d artseek
+```bash
+scripts/start_db.sh --reset
 ```
 
 ### Backend
@@ -350,7 +347,6 @@ Expect HTTP `200` and an empty body. Backend defaults can be overridden through 
 | `DB_URL` | `jdbc:postgresql://localhost:5432/artseek` | Database connection URL. |
 | `DB_USERNAME` | `artseek` | Database user. |
 | `DB_PASSWORD` | `artseek_dev_password` | Password for the local development database. |
-| `JPA_DDL_AUTO` | `update` | Hibernate schema handling. |
 | `SERVER_PORT` | `8080` | HTTP server port. |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | Browser origin allowed by CORS. |
 

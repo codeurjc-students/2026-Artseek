@@ -30,8 +30,8 @@ public class DatabaseInitializer {
                         new Category("Blackwork", CategoryType.TATTOO),
                         new Category("Watercolor", CategoryType.TATTOO))
                 .stream()
-                .filter(category -> categoryRepository.findByNameAndType(
-                        category.getName(), category.getType()).isEmpty())
+                .filter(category -> !categoryRepository.existsByNameAndType(
+                        category.getName(), category.getType()))
                 .toList();
 
         if (!missingCategories.isEmpty()) {

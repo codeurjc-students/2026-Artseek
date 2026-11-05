@@ -6,6 +6,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.artseek.domain.user.Email;
+import com.artseek.domain.user.PasswordHash;
+import com.artseek.domain.user.Role;
 import com.artseek.domain.user.User;
 import com.artseek.domain.user.Username;
 import java.util.Optional;
@@ -22,6 +24,8 @@ class UserRepositoryAdapterUnitTests {
     private static final Email EMAIL = new Email("ada@example.org");
     private static final String PASSWORD_HASH =
             "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaGhhc2g";
+    private static final UserPersistenceModel ADA =
+            new UserPersistenceModel(1L, "ada", "ada@example.org", PASSWORD_HASH, "USER", null, null);
 
     @Mock
     private SpringDataUserRepository springDataUserRepository;
@@ -30,72 +34,73 @@ class UserRepositoryAdapterUnitTests {
     private UserRepositoryAdapter userRepositoryAdapter;
 
     @Test
-    void delegatesFindByIdToSpringDataRepository() {
-        Optional<User> expectedUser = Optional.of(newUser());
-        when(springDataUserRepository.findById(1L)).thenReturn(expectedUser);
+    void mapsTheRowFoundById() {
+        when(springDataUserRepository.findById(1L)).thenReturn(Optional.of(ADA));
 
         Optional<User> result = userRepositoryAdapter.findById(1L);
 
-        assertThat(result).isSameAs(expectedUser);
+        assertThat(result).get().satisfies(user -> {
+            assertThat(user.getId()).isEqualTo(1L);
+            assertThat(user.getUsername()).isEqualTo(USERNAME);
+            assertThat(user.getEmail()).isEqualTo(EMAIL);
+            assertThat(user.getPasswordHash()).isEqualTo(new PasswordHash(PASSWORD_HASH));
+            assertThat(user.getRole()).isEqualTo(Role.USER);
+        });
         verify(springDataUserRepository).findById(1L);
         verifyNoMoreInteractions(springDataUserRepository);
     }
 
     @Test
-    void delegatesFindByUsernameToSpringDataRepository() {
-        Optional<User> expectedUser = Optional.of(newUser());
-        when(springDataUserRepository.findByUsername(USERNAME)).thenReturn(expectedUser);
+    void findsByTheStoredUsernameValue() {
+        when(springDataUserRepository.findByUsername("ada")).thenReturn(Optional.of(ADA));
 
         Optional<User> result = userRepositoryAdapter.findByUsername(USERNAME);
 
-        assertThat(result).isSameAs(expectedUser);
-        verify(springDataUserRepository).findByUsername(USERNAME);
+        assertThat(result).get().extracting(User::getId).isEqualTo(1L);
+        verify(springDataUserRepository).findByUsername("ada");
         verifyNoMoreInteractions(springDataUserRepository);
     }
 
     @Test
-    void delegatesFindByEmailToSpringDataRepository() {
-        Optional<User> expectedUser = Optional.of(newUser());
-        when(springDataUserRepository.findByEmail(EMAIL)).thenReturn(expectedUser);
+    void findsByTheStoredEmailValue() {
+        when(springDataUserRepository.findByEmail("ada@example.org")).thenReturn(Optional.empty());
 
         Optional<User> result = userRepositoryAdapter.findByEmail(EMAIL);
 
-        assertThat(result).isSameAs(expectedUser);
-        verify(springDataUserRepository).findByEmail(EMAIL);
+        assertThat(result).isEmpty();
+        verify(springDataUserRepository).findByEmail("ada@example.org");
         verifyNoMoreInteractions(springDataUserRepository);
     }
 
     @Test
-    void delegatesExistsByUsernameToSpringDataRepository() {
-        when(springDataUserRepository.existsByUsername(USERNAME)).thenReturn(true);
+    void checksUsernameExistenceByTheStoredValue() {
+        when(springDataUserRepository.existsByUsername("ada")).thenReturn(true);
 
         assertThat(userRepositoryAdapter.existsByUsername(USERNAME)).isTrue();
-        verify(springDataUserRepository).existsByUsername(USERNAME);
+        verify(springDataUserRepository).existsByUsername("ada");
         verifyNoMoreInteractions(springDataUserRepository);
     }
 
     @Test
-    void delegatesExistsByEmailToSpringDataRepository() {
-        when(springDataUserRepository.existsByEmail(EMAIL)).thenReturn(false);
+    void checksEmailExistenceByTheStoredValue() {
+        when(springDataUserRepository.existsByEmail("ada@example.org")).thenReturn(false);
 
         assertThat(userRepositoryAdapter.existsByEmail(EMAIL)).isFalse();
-        verify(springDataUserRepository).existsByEmail(EMAIL);
+        verify(springDataUserRepository).existsByEmail("ada@example.org");
         verifyNoMoreInteractions(springDataUserRepository);
     }
 
     @Test
-    void delegatesSaveToSpringDataRepository() {
-        User user = newUser();
-        when(springDataUserRepository.save(user)).thenReturn(user);
+    void savesTheMappedRowAndReturnsTheSavedUser() {
+        UserPersistenceModel unsaved =
+                new UserPersistenceModel(null, "ada", "ada@example.org", PASSWORD_HASH, "USER", null, null);
+        when(springDataUserRepository.save(unsaved)).thenReturn(ADA);
 
-        User result = userRepositoryAdapter.save(user);
+        User result = userRepositoryAdapter.save(User.register(USERNAME, EMAIL, new PasswordHash(PASSWORD_HASH)));
 
-        assertThat(result).isSameAs(user);
-        verify(springDataUserRepository).save(user);
+        assertThat(result.getId()).isEqualTo(1L);
+        assertThat(result.getUsername()).isEqualTo(USERNAME);
+        verify(springDataUserRepository).save(unsaved);
         verifyNoMoreInteractions(springDataUserRepository);
-    }
-
-    private static User newUser() {
-        return User.register("ada", "ada@example.org", PASSWORD_HASH);
     }
 }
