@@ -7,7 +7,7 @@ description: Create, fix, or review Artseek backend elements using DDD Lite, CQR
 
 Use this skill for backend implementation, refactoring, bug fixes, and architecture reviews. Apply the rules to new domain areas and features, not just the existing category operations. Preserve confirmed business requirements and ask the user about unclear behavior or architectural decisions rather than inventing them.
 
-Artseek uses **DDD Lite + CQRS Lite + hexagonal architecture**. Domain entities deliberately carry JPA annotations, and application handlers deliberately use Spring service/transaction annotations to avoid duplicate models and transaction-decorator boilerplate.
+Artseek uses **DDD Lite + CQRS Lite + hexagonal architecture**. The domain is plain Java with no persistence annotations; each aggregate's table shape and mapping live in infrastructure. Application handlers deliberately use Spring service/transaction annotations to avoid transaction-decorator boilerplate.
 
 The user confirmed the existing mediator and handlers as the intended architecture. This replaces the older explicit `<Feature>UseCase` / `<Feature>Service` and `application/usecase/` rules still present in `backend/AGENTS.md`. Its domain and infrastructure package layout follows the per-aggregate structure below, but its application `UseCase`/`Service` wording is retained at the user's request; do not restore the former structure because of that older wording.
 
@@ -25,7 +25,7 @@ REST controller
     -> application query / command handler
       -> domain repository port and domain behavior
         -> infrastructure repository adapter
-          -> Spring Data JPA -> PostgreSQL
+          -> mapper + Spring Data JDBC -> PostgreSQL (schema from Flyway)
 ```
 
 - Domain and application code must never import controllers, infrastructure adapters, or Spring Data repositories.
@@ -34,7 +34,7 @@ REST controller
 - Controllers performing application operations inject the application `Mediator` interface, not `SpringMediator`, individual handlers, repositories, or concrete application services.
 - Use constructor injection and `final` fields for production dependencies. A single constructor does not need `@Autowired`; the annotation itself is not forbidden.
 
-`src/test/java/com/artseek/HexagonalArchitectureUnitTests` enforces these boundaries with ArchUnit: the domain imports nothing from application, infrastructure, Spring web or Spring Data; the application imports nothing from infrastructure; controllers do not depend on handlers or repositories; and one aggregate's infrastructure does not depend on another aggregate's infrastructure. Keep it passing. Change a rule only when the user confirms an architectural change.
+`src/test/java/com/artseek/HexagonalArchitectureUnitTests` enforces these boundaries with ArchUnit: the domain depends only on `java..` and `com.artseek.domain..`; no class uses `jakarta.persistence` or `org.hibernate`; persistence models, mappers and Spring Data repositories are used only inside their own `infrastructure/<aggregate>/repository` package; the application imports nothing from infrastructure; controllers do not depend on handlers or repositories; and one aggregate's infrastructure does not depend on another aggregate's infrastructure. Keep it passing. Change a rule only when the user confirms an architectural change.
 
 ## Directory and package layout
 
@@ -58,7 +58,7 @@ src/main/java/com/artseek/
   infrastructure/
     <aggregate>/
       api/                              REST controllers for the aggregate
-      repository/                       Persistence adapters and Spring Data
+      repository/                       Adapter, persistence model, mapper, Spring Data repository
       exceptions/                       Only when an infrastructure exception exists
     api/                                Cross-cutting HTTP: health/, shared error DTOs and advice
     bootstrap/                          Startup/sample-data initialization
@@ -87,23 +87,26 @@ application/category/
 
 ### Entities and invariants
 
-Domain entities may use Jakarta persistence annotations such as `@Entity`, `@Id`, `@GeneratedValue`, `@Column`, and `@Enumerated`. This is the accepted DDD Lite compromise: persistence coupling avoids duplicate domain/persistence models, while business behavior remains in the domain.
+The domain is persistence-ignorant plain Java: no `jakarta.persistence`, `org.hibernate` or Spring annotations, and no constructors that exist only for a framework. ArchUnit enforces that it depends only on the JDK and itself.
 
-- Provide the protected no-argument constructor required by JPA and validated public constructors/factories for ordinary use.
-- Avoid public setters and anemic data structures. Expose meaningful operations such as `rename` or `changeType`, enforcing invariants on construction and state changes.
-- Entities have persistent identity independent of mutable attributes. A generated identifier can be `null` until persistence assigns it; do not assume new entities already have IDs.
+- Provide validated public constructors or creation factories for new aggregates, such as `new Category(name, type)` or `User.register(...)`. A new aggregate has `id == null`; the database generates the id on the first save.
+- Provide a `restore(...)` factory that rebuilds an existing aggregate from persisted values, such as `Category.restore(id, name, type)` or `User.restore(id, username, email, passwordHash, role)`. It runs the same validation as creation, so stored data that breaks a current rule fails when loaded. When a rule becomes stricter, ship a Flyway data migration that fixes the existing rows in the same PR.
+- Validation lives in the type that owns the rule. Value objects such as `Username`, `Email` and `PasswordHash` validate in their constructors; the aggregate validates its other fields through explicit `validateX` methods that throw its domain exception. Do not use `Objects.requireNonNull` or generic null-check helpers, and do not re-check a value object the aggregate receives.
+- Make fields `final` unless a domain operation changes them. Avoid public setters and anemic data structures. Expose meaningful operations such as `rename` or `changeType`, enforcing invariants on construction and state changes.
+- Entities have persistent identity independent of mutable attributes. Do not assume new entities already have IDs.
+- The domain has no timestamp fields. `created_at` / `updated_at` belong to the database; add them to the domain only for a confirmed requirement.
 
 ### Closed vocabularies and exceptions
 
 - Use Java enums for confirmed closed business vocabularies. Each constant owns a stable lowercase public string, such as `CategoryType.PAINTING.value()` returning `"painting"`.
 - Parse external strings through domain methods such as `CategoryType.fromValue`, retaining the domain's established validation and normalization behavior. Do not invent new enum values.
-- Persist enums with `@Enumerated(EnumType.STRING)`, never ordinal values. The stored enum name and its public string value serve different boundaries.
+- Store enums by their constant **name** (for example `PAINTING`), never the ordinal. Only the mapper converts with `name()` / `valueOf(...)`; `fromValue` parses public API strings. The stored name and the public value serve different boundaries.
 - Put aggregate-specific validation exceptions in `domain/<aggregate>/exceptions/`, extending `domain/shared/DomainValidationException`. Do not expose generic `NullPointerException` or `IllegalArgumentException` as domain validation failures.
 - Give exceptions a stable fixed message, exposed as `MESSAGE` when appropriate, and structured rejected-input data with an accessor. HTTP translation belongs at the API boundary.
 
 ## CQRS Lite requests and handlers
 
-The existing CQRS implementation separates reads and writes through synchronous in-process dispatch over the shared domain/JPA model and PostgreSQL database. The mediator routes requests; handlers implement the use cases.
+The existing CQRS implementation separates reads and writes through synchronous in-process dispatch over the shared domain model and PostgreSQL database. The mediator routes requests; handlers implement the use cases.
 
 ### Request input and result contracts
 
@@ -112,11 +115,11 @@ The existing CQRS implementation separates reads and writes through synchronous 
 | Read | Immutable record implementing `Query<R>` | The concrete query record in `handle(Q query)` | The declared application DTO result, or immutable collection of DTOs | `mediator.send(query)` |
 | Write | Immutable record implementing `Command<Void>` by default | The concrete command record in `handle(C command)` | No application result; with the existing generic API, `Void handle(...)` returns `null` after successful execution | `mediator.dispatch(command)` |
 
-Requests contain the application-level inputs needed by the operation, such as IDs, strings, and other simple values. An operation with no input uses an empty record. Controllers construct requests from HTTP input; handlers receive the application request, not HTTP request/response objects or a JPA entity supplied by the controller. Handlers convert and validate external values through domain types before accessing persistence when that validation does not require loading data.
+Requests contain the application-level inputs needed by the operation, such as IDs, strings, and other simple values. An operation with no input uses an empty record. Controllers construct requests from HTTP input; handlers receive the application request, not HTTP request/response objects or a domain aggregate supplied by the controller. Handlers convert and validate external values through domain types before accessing persistence when that validation does not require loading data.
 
 Commands should in principle return nothing. The existing `Command<R>` / `CommandHandler<C, R>` / `CommandBus` contracts permit a generic result, but that capability does not establish a result-returning command convention. Use `Void` for new commands and ask the user before introducing an exception that returns a DTO, generated ID, or another result. Do not change the shared generic interfaces as part of adding an ordinary feature.
 
-Query results must not expose domain/JPA entities or domain enums. For example:
+Query results must not expose domain aggregates or domain enums. For example:
 
 ```java
 public record FindCategoriesByTypeQuery(String type)
@@ -131,7 +134,7 @@ The matching handler implements `QueryHandler<FindCategoriesByTypeQuery, List<Ca
 - Implement `queryType()` or `commandType()` to return the exact concrete request class. The request, handler generic parameters, and `handle` result must agree.
 - Register handlers with `@Service` and inject required domain repository ports through constructors.
 - Queries read without mutating domain state and use `@Transactional(readOnly = true)` on the use-case boundary.
-- Commands load required entities through ports, invoke their domain operations, and persist through ports as needed. Use `@Transactional` for the write use-case boundary, then return `null` for `Void`.
+- Commands load required aggregates through ports, invoke their domain operations, and **always** call `repository.save(aggregate)` afterwards, continuing with the returned aggregate. There is no dirty checking: a mutated aggregate that is not saved is not persisted. Use `@Transactional` for the write use-case boundary, then return `null` for `Void`.
 - Keep handlers in the application layer despite Spring annotations. Layer membership follows responsibility; moving them into infrastructure would move use-case behavior out of its layer.
 - Keep handlers directly constructible and unit-testable without Spring.
 
@@ -145,23 +148,72 @@ The matching handler implements `QueryHandler<FindCategoriesByTypeQuery, List<Ca
 
 Repository interfaces in `domain/<aggregate>/repository/` use domain types and express what the core needs. They are outbound ports, not Spring Data interfaces. Handlers depend on those ports only.
 
-For each persisted entity, use:
+For each aggregate, `infrastructure/<aggregate>/repository/` contains:
 
 ```text
-<Entity>Repository                 domain/<aggregate>/repository/: domain port
-<Entity>RepositoryAdapter          infrastructure/<aggregate>/repository/: @Repository
-SpringData<Entity>Repository       infrastructure/<aggregate>/repository/: Spring Data JPA
+<Aggregate>Repository              domain/<aggregate>/repository/: domain port
+<Aggregate>RepositoryAdapter       @Repository implementing the port; the only user of the three below
+<Aggregate>PersistenceModel        package-private @Table record: the table row, primitive columns only
+<Aggregate>Mapper                  package-private: toPersistence(aggregate) / toDomain(model)
+SpringData<Aggregate>Repository    package-private ListCrudRepository<<Aggregate>PersistenceModel, Long>
 ```
 
-The adapter implements the domain port and delegates to Spring Data through constructor injection. A technology-specific name such as `Jpa<Entity>RepositoryAdapter` is needed only when multiple persistence technologies make the ordinary name ambiguous. Do not import adapters or Spring Data repositories into application code.
+Persistence models, mappers and Spring Data interfaces never leave their `repository` package; ArchUnit enforces it. Do not import adapters or Spring Data repositories into application code. A technology-specific name such as `Jdbc<Aggregate>RepositoryAdapter` is needed only when multiple persistence technologies make the ordinary name ambiguous.
 
-Use explicit JPQL when derived-query names cannot clearly express the operation. For operations requiring unique, ordered values, express those semantics explicitly, as in the existing `select distinct ... order by ...` used-type query. Do not promise ordering for queries whose contract does not specify it.
+**Persistence model.** A record annotated only with Spring Data annotations (`org.springframework.data.annotation.*`, `org.springframework.data.relational.core.mapping.*`), never `jakarta.persistence`:
+
+```java
+@Table("categories")
+record CategoryPersistenceModel(
+        @Id Long id,
+        String name,
+        String type,                         // CategoryType name, e.g. PAINTING
+        // Managed by the database: DEFAULT now() and trg_categories_set_updated_at (V1, V2)
+        @ReadOnlyProperty Instant createdAt,
+        @ReadOnlyProperty Instant updatedAt) {
+
+    static final String NAME_TYPE_CONSTRAINT = "uq_categories_name_type";
+
+    /** Lets Spring Data set the generated id on the saved copy. */
+    CategoryPersistenceModel withId(Long id) { ... }
+}
+```
+
+- Columns are plain types (`String`, `Long`, `Instant`). Value objects and enums are converted only by the mapper.
+- The model carries no lengths, constraints or defaults: the Flyway migration is the source of truth and the model follows it. Add `@Column("...")` only when the default snake_case naming does not produce the column name.
+- Database-owned timestamps are `@ReadOnlyProperty`: never written (an explicit `NULL` would bypass `DEFAULT now()`), but read on SELECT.
+- Constraint-name constants used by tests or error translation live on the persistence model, not in the domain.
+
+**Mapper.** A `final` class with a private constructor and static `toPersistence(...)` / `toDomain(...)`. It is the only place that turns value objects into strings and back, and enums into stored names and back. `toPersistence` passes `null` for the read-only timestamps; `toDomain` always rebuilds through the aggregate's `restore(...)`, so stored values are validated again.
+
+**Spring Data repository.** Prefer derived queries. Their parameters are the stored strings, which only the adapter supplies from value objects (`username.value()`, `type.name()`), so they are always normalized. Write SQL with `@Query` only when a derived query cannot express the operation clearly, as in `SELECT DISTINCT type FROM categories ORDER BY type`. Always use bound parameters (`:name`), never string concatenation. Do not promise ordering for queries whose contract does not specify it.
+
+**Adapter.** Maps domain arguments to stored values, delegates to Spring Data, and maps results back through the mapper. `save` and `saveAll` always map and return the result of Spring Data's save, which carries the generated id. A `null` id means INSERT; a non-null id means UPDATE.
+
+## Database schema and Flyway migrations
+
+The schema comes only from hand-written Flyway migrations in `src/main/resources/db/migration/`, in production and tests. Nothing is generated from code, and Spring Data JDBC does not validate the schema at startup.
+
+- Write one `V<n>__<description>.sql` per change. Flyway applies them in order and checksums each one in `flyway_schema_history`. Never edit a migration once it is merged; every schema change is a new migration.
+- For a schema change: write the migration, update the persistence model, mapper and adapter, then run the tests. Flyway builds a fresh Testcontainers database, and the adapter integration tests catch mismatches between model and schema.
+- Ids are `BIGINT GENERATED ALWAYS AS IDENTITY`. Every table has `created_at` / `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` and a `BEFORE UPDATE` trigger calling the shared `set_updated_at()` function (V1), which refreshes `updated_at` only when the row actually changed.
+- Name every database object explicitly with the prefix convention `<type>_<table>_<columns>`, in snake_case and at most 63 characters (the PostgreSQL limit):
+
+| Object | Pattern | Example |
+| --- | --- | --- |
+| Primary key | `pk_<table>` | `pk_categories` |
+| Unique | `uq_<table>_<columns>` | `uq_categories_name_type`, `uq_users_email` |
+| Foreign key | `fk_<table>_<column>_<referenced_table>` | `fk_artworks_author_id_users` |
+| Index | `ix_<table>_<columns>` | `ix_categories_type` |
+| Check | `ck_<table>_<description>` | `ck_users_role_valid` |
+| Trigger | `trg_<table>_<action>` | `trg_categories_set_updated_at` |
+| Function | `<verb>_<object>` | `set_updated_at` |
 
 Distinguish a vocabulary's **supported values** (all domain enum values, independent of storage) from **used values** (values represented by persisted rows). A supported-value query reads the enum without querying persistence; a used-value query calls the domain repository port. These are separate operations.
 
 ## Application DTOs
 
-Never expose domain/JPA entities directly from the API. Use reusable application DTO records at the nearest common package when current or future related operations can share them.
+Never expose domain aggregates directly from the API. Use reusable application DTO records at the nearest common package when current or future related operations can share them.
 
 - Prefer transport-safe basic values such as `String`, `Long`, `Boolean`, and time primitives.
 - Map domain enums to their stable public strings rather than placing domain enum types in DTOs.
