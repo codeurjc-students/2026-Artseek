@@ -308,24 +308,18 @@ docker info
 
 ### PostgreSQL
 
-From the repository root, create the development container with the command used by the project:
+From the repository root, start the development database with:
 
-```powershell
-docker run --name postgresDb -e POSTGRES_DB=artseek -e POSTGRES_USER=artseek -e POSTGRES_PASSWORD=artseek_dev_password -p 5432:5432 -v artseek_postgres_data:/var/lib/postgresql/data -d postgres:17
+```bash
+scripts/start_db.sh
 ```
 
-This manual command is the current setup. It will later be replaced by Docker Compose, with the database service configuration declared in a Compose file. That configuration has not been added yet.
+The script creates the `postgresDb` container (`postgres:17.11`, port 5432, database and user `artseek`) on first run, starts it on later runs, and waits until PostgreSQL accepts connections. The named volume `artseek_postgres_data` retains the database files. Run it from Git Bash on Windows. It is the current setup until Docker Compose replaces it.
 
-The named volume `artseek_postgres_data` retains the database files. On later sessions, start the existing container:
+The schema is created by Flyway when the backend starts. To discard all local data and start from an empty database, for example when the database was created by Hibernate before Flyway was introduced, run:
 
-```powershell
-docker start postgresDb
-```
-
-Check that PostgreSQL is accepting connections before starting the backend:
-
-```powershell
-docker exec postgresDb pg_isready -U artseek -d artseek
+```bash
+scripts/start_db.sh --reset
 ```
 
 ### Backend
@@ -350,7 +344,6 @@ Expect HTTP `200` and an empty body. Backend defaults can be overridden through 
 | `DB_URL` | `jdbc:postgresql://localhost:5432/artseek` | Database connection URL. |
 | `DB_USERNAME` | `artseek` | Database user. |
 | `DB_PASSWORD` | `artseek_dev_password` | Password for the local development database. |
-| `JPA_DDL_AUTO` | `update` | Hibernate schema handling. |
 | `SERVER_PORT` | `8080` | HTTP server port. |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | Browser origin allowed by CORS. |
 

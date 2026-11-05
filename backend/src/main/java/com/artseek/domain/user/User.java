@@ -27,8 +27,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 })
 public class User {
 
-    public static final String USERNAME_CONSTRAINT = "uk_users_username";
-    public static final String EMAIL_CONSTRAINT = "uk_users_email";
+    public static final String USERNAME_CONSTRAINT = "uq_users_username";
+    public static final String EMAIL_CONSTRAINT = "uq_users_email";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
